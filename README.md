@@ -89,6 +89,12 @@ Alle Läufe schreiben nach `/var/log/ugreen-docker-toolkit`. Dort landen:
 - Markdown-Zusammenfassung des Docker-Management-Audits
 - Duplikatbericht, wenn `--duplicate-scan-root` gesetzt wurde
 
+## PowerShell, Ollama und Codex
+
+Für die Vorbereitung von Admin-Workstations gibt es eine separate Anleitung mit PowerShell-Befehlen, Ollama-Basischeck, optionalem Codex-CLI-Workflow und SSH/SCP-Beispielen für das Kopieren und Ausführen des Toolkits auf dem NAS:
+
+- [`docs/powershell-ollama-codex-tooling.md`](docs/powershell-ollama-codex-tooling.md)
+
 ## Unterstützte Umgebung
 
 Das Toolkit ist für Linux-basierte UGREEN NAS-/Server-Systeme gedacht, auf denen Docker über `systemd`, `service` oder direkt über die Docker-CLI verwaltet wird.
