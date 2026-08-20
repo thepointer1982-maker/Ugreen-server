@@ -24,6 +24,11 @@ while [[ $# -gt 0 ]]; do
 done
 [[ "$INTERVAL_MINUTES" =~ ^[1-9][0-9]*$ ]] || { echo 'interval must be a positive integer' >&2; exit 64; }
 (( INTERVAL_MINUTES >= 5 )) || { echo 'interval below 5 minutes refused' >&2; exit 64; }
+# Keep generated unit syntax unambiguous and fail closed on unsafe path bytes.
+if [[ "$REPO_ROOT" =~ [[:space:]%] ]]; then
+  echo 'repository path containing whitespace or % is not supported by the hardened systemd installer' >&2
+  exit 64
+fi
 command -v systemctl >/dev/null 2>&1 || { echo 'systemd is required for this installer' >&2; exit 2; }
 systemctl --user show-environment >/dev/null 2>&1 || { echo 'systemd user manager unavailable' >&2; exit 2; }
 
