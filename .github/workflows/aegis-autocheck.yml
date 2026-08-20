@@ -85,9 +85,13 @@ jobs:
         run: |
           git config user.name 'aegis-autocheck[bot]'
           git config user.email 'aegis-autocheck@users.noreply.github.com'
-          # Stage only the two bot-generated outputs, including deletion of a
-          # stale fix package when the new verified run has no findings.
-          git add -A -- dashboard/autocheck.json fixes/done/fix-package-002.json
+          # Stage only bot-generated outputs. Include a deletion only when that
+          # path is already tracked; never broaden staging to other files.
+          for path in dashboard/autocheck.json fixes/done/fix-package-002.json; do
+            if [[ -e "$path" ]] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+              git add -A -- "$path"
+            fi
+          done
           if git diff --cached --quiet; then
             echo 'No generated changes.'
             exit 0
