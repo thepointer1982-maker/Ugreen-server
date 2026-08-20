@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SOURCE_ROOT="${AEGIS_SOURCE_ROOT:-$HOME/Library/Application Support/AEGIS-Device-AI}"
+if [[ -n "${AEGIS_SOURCE_ROOT:-}" ]]; then
+  SOURCE_ROOT="$AEGIS_SOURCE_ROOT"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  SOURCE_ROOT="$HOME/Library/Application Support/AEGIS-Device-AI"
+else
+  SOURCE_ROOT="/var/lib/aegis-device-ai"
+fi
+
 REPO_ROOT="${1:-$(pwd)}"
 SCORES_DIR="$REPO_ROOT/scores"
 DASH_DIR="$REPO_ROOT/dashboard"
-TMP_DIR="${TMPDIR:-/tmp}/aegis-export.$$"
-trap 'rm -rf "$TMP_DIR"' EXIT
-mkdir -p "$TMP_DIR" "$SCORES_DIR" "$DASH_DIR"
+mkdir -p "$SCORES_DIR" "$DASH_DIR"
 
 copy_if_present() {
   local src="$1" dst="$2"
@@ -28,11 +33,22 @@ if grep -RIEq '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]+|github_pat_|
   exit 2
 fi
 
+hash_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1"
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1"
+  else
+    echo "AEGIS export aborted: no SHA-256 utility available" >&2
+    exit 4
+  fi
+}
+
 (
   cd "$SCORES_DIR"
   : > manifest.sha256
   for f in latest.json deepdiag.json history.jsonl; do
-    [[ -f "$f" ]] && shasum -a 256 "$f" >> manifest.sha256
+    [[ -f "$f" ]] && hash_file "$f" >> manifest.sha256
   done
 )
 
