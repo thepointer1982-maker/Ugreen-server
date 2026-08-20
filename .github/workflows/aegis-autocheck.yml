@@ -9,7 +9,10 @@ on:
       - 'scripts/aegis_export_collect.sh'
       - 'scripts/aegis_source_detect.sh'
       - 'scripts/aegis_nas_run_once.sh'
+      - 'scripts/aegis_scheduled_run.sh'
+      - 'scripts/aegis_scheduler_install.sh'
       - 'scripts/test_aegis_pipeline.py'
+      - 'scripts/test_aegis_scheduler.py'
       - '.github/workflows/aegis-autocheck.yml'
   pull_request:
     paths:
@@ -18,7 +21,10 @@ on:
       - 'scripts/aegis_export_collect.sh'
       - 'scripts/aegis_source_detect.sh'
       - 'scripts/aegis_nas_run_once.sh'
+      - 'scripts/aegis_scheduled_run.sh'
+      - 'scripts/aegis_scheduler_install.sh'
       - 'scripts/test_aegis_pipeline.py'
+      - 'scripts/test_aegis_scheduler.py'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
 
@@ -38,6 +44,9 @@ jobs:
 
       - name: Run AEGIS pipeline regression tests
         run: python3 scripts/test_aegis_pipeline.py
+
+      - name: Run AEGIS scheduler regression tests
+        run: python3 scripts/test_aegis_scheduler.py
 
       - name: Detect real score data
         id: detect
@@ -101,8 +110,6 @@ jobs:
         run: |
           git config user.name 'aegis-autocheck[bot]'
           git config user.email 'aegis-autocheck@users.noreply.github.com'
-          # Stage only bot-generated outputs. Include a deletion only when that
-          # path is already tracked; never broaden staging to other files.
           for path in dashboard/autocheck.json fixes/done/fix-package-002.json; do
             if [[ -e "$path" ]] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
               git add -A -- "$path"
