@@ -91,8 +91,12 @@ class AegisPipelineTests(unittest.TestCase):
             env=env,
         )
 
+    def bootstrap_state_dir(self, repo: Path) -> Path:
+        return repo.parent / "bootstrap-state"
+
     def run_bootstrap(self, repo: Path, source: Optional[Path] = None, *args: str) -> subprocess.CompletedProcess:
         env = os.environ.copy()
+        env["AEGIS_STATE_DIR"] = str(self.bootstrap_state_dir(repo))
         if source is not None:
             env["AEGIS_SOURCE_ROOT"] = str(source)
         else:
@@ -104,6 +108,9 @@ class AegisPipelineTests(unittest.TestCase):
             capture_output=True,
             env=env,
         )
+
+    def read_bootstrap_report(self, repo: Path) -> dict:
+        return json.loads((self.bootstrap_state_dir(repo) / "preflight.json").read_text(encoding="utf-8"))
 
     def run_autocheck(self, repo: Path) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -254,9 +261,10 @@ class AegisPipelineTests(unittest.TestCase):
             cp = self.run_bootstrap(repo)
             self.assertEqual(cp.returncode, 20)
             self.assertIn("source_invalid_explicit_source", cp.stdout + cp.stderr)
-            report = json.loads((repo / ".aegis-bootstrap" / "preflight.json").read_text(encoding="utf-8"))
+            report = self.read_bootstrap_report(repo)
             self.assertEqual(report["status"], "blocked")
             self.assertIn("source_invalid_explicit_source", report["blockers"])
+            self.assertFalse((repo / ".aegis-bootstrap").exists())
 
     def test_bootstrap_blocks_unexpected_origin(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -264,22 +272,35 @@ class AegisPipelineTests(unittest.TestCase):
             subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/wrong.git"], cwd=repo, check=True)
             cp = self.run_bootstrap(repo, src)
             self.assertEqual(cp.returncode, 20)
-            report = json.loads((repo / ".aegis-bootstrap" / "preflight.json").read_text(encoding="utf-8"))
+            report = self.read_bootstrap_report(repo)
             self.assertIn("unexpected_origin", report["blockers"])
 
-    def test_bootstrap_ready_preflight_does_not_commit_or_push(self) -> None:
+    def test_bootstrap_ready_preflight_does_not_commit_or_dirty_repo(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             td = Path(raw); repo = self.make_repo(td); src = self.make_source(td)
             subprocess.run(["git", "remote", "add", "origin", "https://github.com/thepointer1982-maker/Ugreen-server.git"], cwd=repo, check=True)
             before = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
             cp = self.run_bootstrap(repo, src)
             after = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            status = subprocess.check_output(["git", "status", "--porcelain"], cwd=repo, text=True)
             self.assertEqual(cp.returncode, 0, cp.stderr)
             self.assertEqual(before, after)
+            self.assertEqual(status, "")
             self.assertIn("AEGIS_BOOTSTRAP status=ready", cp.stdout)
-            report = json.loads((repo / ".aegis-bootstrap" / "preflight.json").read_text(encoding="utf-8"))
+            report = self.read_bootstrap_report(repo)
+            self.assertEqual(report["schema_version"], 2)
             self.assertEqual(report["status"], "ready")
             self.assertEqual(report["source"]["status"], "ready")
+
+    def test_bootstrap_push_requires_main(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw); repo = self.make_repo(td); src = self.make_source(td)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/thepointer1982-maker/Ugreen-server.git"], cwd=repo, check=True)
+            subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True, text=True)
+            cp = self.run_bootstrap(repo, src, "--push")
+            self.assertEqual(cp.returncode, 20)
+            report = self.read_bootstrap_report(repo)
+            self.assertIn("push_requires_main", report["blockers"])
 
 
 if __name__ == "__main__":
