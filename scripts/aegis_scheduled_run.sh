@@ -16,23 +16,26 @@ log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$LOG_FILE"
 }
 
-# Portable mkdir lock. Stale locks older than 2 hours are removed.
+# Portable mkdir lock. Stale locks older than 2 hours are recovered. Any lock
+# acquisition error other than an existing lock fails closed.
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  if [[ -d "$LOCK_DIR" ]]; then
-    now="$(date +%s)"
-    if stat -c %Y "$LOCK_DIR" >/dev/null 2>&1; then
-      mtime="$(stat -c %Y "$LOCK_DIR")"
-    else
-      mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null || echo "$now")"
-    fi
-    if (( now - mtime > 7200 )); then
-      rm -rf -- "$LOCK_DIR"
-      mkdir "$LOCK_DIR" || { log 'status=skip reason=lock_busy'; exit 0; }
-      log 'status=warning reason=stale_lock_recovered'
-    else
-      log 'status=skip reason=lock_busy'
-      exit 0
-    fi
+  if [[ ! -d "$LOCK_DIR" ]]; then
+    log 'status=error reason=lock_acquisition_failed'
+    exit 13
+  fi
+  now="$(date +%s)"
+  if stat -c %Y "$LOCK_DIR" >/dev/null 2>&1; then
+    mtime="$(stat -c %Y "$LOCK_DIR")"
+  else
+    mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null || echo "$now")"
+  fi
+  if (( now - mtime > 7200 )); then
+    rmdir "$LOCK_DIR" 2>/dev/null || { log 'status=skip reason=stale_lock_not_empty_or_changed'; exit 0; }
+    mkdir "$LOCK_DIR" || { log 'status=skip reason=lock_raced'; exit 0; }
+    log 'status=warning reason=stale_lock_recovered'
+  else
+    log 'status=skip reason=lock_busy'
+    exit 0
   fi
 fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
