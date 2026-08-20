@@ -37,6 +37,7 @@ class AegisPipelineTests(unittest.TestCase):
             "aegis_repo_autocheck.py",
             "aegis_source_detect.sh",
             "aegis_nas_run_once.sh",
+            "aegis_nas_bootstrap.sh",
         ):
             shutil.copy2(SCRIPTS / name, repo / "scripts" / name)
         subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
@@ -89,6 +90,27 @@ class AegisPipelineTests(unittest.TestCase):
             capture_output=True,
             env=env,
         )
+
+    def bootstrap_state_dir(self, repo: Path) -> Path:
+        return repo.parent / "bootstrap-state"
+
+    def run_bootstrap(self, repo: Path, source: Optional[Path] = None, *args: str) -> subprocess.CompletedProcess:
+        env = os.environ.copy()
+        env["AEGIS_STATE_DIR"] = str(self.bootstrap_state_dir(repo))
+        if source is not None:
+            env["AEGIS_SOURCE_ROOT"] = str(source)
+        else:
+            env["AEGIS_SOURCE_ROOT"] = str(repo / "missing-source")
+        return subprocess.run(
+            ["bash", str(repo / "scripts" / "aegis_nas_bootstrap.sh"), *args],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+
+    def read_bootstrap_report(self, repo: Path) -> dict:
+        return json.loads((self.bootstrap_state_dir(repo) / "preflight.json").read_text(encoding="utf-8"))
 
     def run_autocheck(self, repo: Path) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -221,7 +243,6 @@ class AegisPipelineTests(unittest.TestCase):
             latest = json.loads(latest_p.read_text(encoding="utf-8"))
             latest["run_id"] = "tampered-run"
             latest_p.write_text(json.dumps(latest) + "\n", encoding="utf-8")
-            # Re-hash latest to prove provenance is checked independently of file integrity.
             manifest_p = repo / "scores" / "manifest.sha256"
             lines = []
             for raw_line in manifest_p.read_text(encoding="utf-8").splitlines():
@@ -233,6 +254,53 @@ class AegisPipelineTests(unittest.TestCase):
             cp = self.run_autocheck(repo)
             self.assertEqual(cp.returncode, 5)
             self.assertIn("source_id_mismatch:run_id", cp.stdout)
+
+    def test_bootstrap_reports_missing_source_with_remediation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw); repo = self.make_repo(td)
+            cp = self.run_bootstrap(repo)
+            self.assertEqual(cp.returncode, 20)
+            self.assertIn("source_invalid_explicit_source", cp.stdout + cp.stderr)
+            report = self.read_bootstrap_report(repo)
+            self.assertEqual(report["status"], "blocked")
+            self.assertIn("source_invalid_explicit_source", report["blockers"])
+            self.assertFalse((repo / ".aegis-bootstrap").exists())
+
+    def test_bootstrap_blocks_unexpected_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw); repo = self.make_repo(td); src = self.make_source(td)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/wrong.git"], cwd=repo, check=True)
+            cp = self.run_bootstrap(repo, src)
+            self.assertEqual(cp.returncode, 20)
+            report = self.read_bootstrap_report(repo)
+            self.assertIn("unexpected_origin", report["blockers"])
+
+    def test_bootstrap_ready_preflight_does_not_commit_or_dirty_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw); repo = self.make_repo(td); src = self.make_source(td)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/thepointer1982-maker/Ugreen-server.git"], cwd=repo, check=True)
+            before = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            cp = self.run_bootstrap(repo, src)
+            after = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            status = subprocess.check_output(["git", "status", "--porcelain"], cwd=repo, text=True)
+            self.assertEqual(cp.returncode, 0, cp.stderr)
+            self.assertEqual(before, after)
+            self.assertEqual(status, "")
+            self.assertIn("AEGIS_BOOTSTRAP status=ready", cp.stdout)
+            report = self.read_bootstrap_report(repo)
+            self.assertEqual(report["schema_version"], 2)
+            self.assertEqual(report["status"], "ready")
+            self.assertEqual(report["source"]["status"], "ready")
+
+    def test_bootstrap_push_requires_main(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw); repo = self.make_repo(td); src = self.make_source(td)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/thepointer1982-maker/Ugreen-server.git"], cwd=repo, check=True)
+            subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True, text=True)
+            cp = self.run_bootstrap(repo, src, "--push")
+            self.assertEqual(cp.returncode, 20)
+            report = self.read_bootstrap_report(repo)
+            self.assertIn("push_requires_main", report["blockers"])
 
 
 if __name__ == "__main__":
