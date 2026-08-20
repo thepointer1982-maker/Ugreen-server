@@ -5,16 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=aegis
-Group=aegis
+User=@AEGIS_USER@
+Group=@AEGIS_GROUP@
 EnvironmentFile=-/etc/aegis/bridge.env
-WorkingDirectory=/opt/aegis/Ugreen-server
-ExecStart=/usr/bin/env bash /opt/aegis/Ugreen-server/scripts/aegis_local_bridge.sh
+WorkingDirectory=@AEGIS_REPO_ROOT@
+ExecStart=/usr/bin/env bash @AEGIS_REPO_ROOT@/scripts/aegis_local_bridge.sh
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/aegis/Ugreen-server /var/log/aegis
+ProtectSystem=full
+ProtectHome=false
+ReadWritePaths=@AEGIS_REPO_ROOT@
 LockPersonality=true
 MemoryDenyWriteExecute=true
 RestrictRealtime=true
