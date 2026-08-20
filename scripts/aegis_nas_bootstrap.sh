@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # AEGIS NAS bootstrap/recovery helper.
-# Default is read-only except for an optional local state directory under the repo.
+# Default is read-only except for a persistent local state report outside the repo.
 # It does not control devices, alter NAS services, install packages, or push to GitHub.
 
 REPO_ROOT="$(pwd)"
@@ -20,6 +20,9 @@ Default: perform preflight only and print exact blockers/remediation.
 --commit    Pass --commit to the one-shot runner (implies --run).
 --push      Pass --push to the one-shot runner (implies --run and --commit).
 --repo-root Repository root (default: current directory).
+
+State report defaults to $XDG_STATE_HOME/aegis-bootstrap/preflight.json or
+$HOME/.local/state/aegis-bootstrap/preflight.json. Override with AEGIS_STATE_DIR.
 EOF
 }
 
@@ -34,8 +37,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+[[ -d "$REPO_ROOT" ]] || { echo "AEGIS_BOOTSTRAP status=blocked reason=repo_root_missing" >&2; exit 20; }
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
-STATE_DIR="$REPO_ROOT/.aegis-bootstrap"
+STATE_DIR="${AEGIS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/aegis-bootstrap}"
 REPORT="$STATE_DIR/preflight.json"
 mkdir -p "$STATE_DIR"
 
@@ -43,6 +47,14 @@ python3_cmd="$(command -v python3 || true)"
 git_cmd="$(command -v git || true)"
 bash_cmd="$(command -v bash || true)"
 sha_cmd="$(command -v sha256sum || command -v shasum || true)"
+
+# Python is required by the AEGIS pipeline itself. Handle this blocker before
+# trying to generate the JSON report with Python.
+if [[ -z "$python3_cmd" ]]; then
+  echo "AEGIS_BOOTSTRAP status=blocked reason=python3_missing" >&2
+  echo "Remediation: Install/enable Python 3 using the NAS-supported package mechanism." >&2
+  exit 20
+fi
 
 repo_ok=0
 branch=""
@@ -98,31 +110,34 @@ case "$remote" in
   *thepointer1982-maker/Ugreen-server.git|*thepointer1982-maker/Ugreen-server) origin_expected=1 ;;
 esac
 
-python3 - "$REPORT" "$REPO_ROOT" "$repo_ok" "$branch" "$remote" "$origin_expected" "$python3_cmd" "$git_cmd" "$bash_cmd" "$sha_cmd" "$write_ok" "$source_status" "$source_root" "$source_output" "${missing_scripts[*]}" <<'PY'
+python3 - "$REPORT" "$REPO_ROOT" "$repo_ok" "$branch" "$remote" "$origin_expected" "$python3_cmd" "$git_cmd" "$bash_cmd" "$sha_cmd" "$write_ok" "$source_status" "$source_root" "$source_output" "${missing_scripts[*]}" "$DO_PUSH" <<'PY'
 import json, sys
 from datetime import datetime, timezone
 from pathlib import Path
 (
     report, repo_root, repo_ok, branch, remote, origin_expected,
     python3_cmd, git_cmd, bash_cmd, sha_cmd, write_ok,
-    source_status, source_root, source_output, missing_scripts,
+    source_status, source_root, source_output, missing_scripts, do_push,
 ) = sys.argv[1:]
 blockers = []
 if repo_ok != '1': blockers.append('not_git_repository')
-if not python3_cmd: blockers.append('python3_missing')
 if not git_cmd: blockers.append('git_missing')
 if not bash_cmd: blockers.append('bash_missing')
 if not sha_cmd: blockers.append('sha256_utility_missing')
-if write_ok != '1': blockers.append('repo_state_not_writable')
+if write_ok != '1': blockers.append('state_dir_not_writable')
 if missing_scripts: blockers.append('required_scripts_missing')
 if repo_ok == '1' and not branch: blockers.append('detached_head')
 if remote and origin_expected != '1': blockers.append('unexpected_origin')
+if do_push == '1' and not remote: blockers.append('origin_missing_for_push')
+if do_push == '1' and origin_expected != '1': blockers.append('origin_not_allowed_for_push')
+if do_push == '1' and branch != 'main': blockers.append('push_requires_main')
 if source_status != 'ready': blockers.append(f'source_{source_status}')
 status = 'ready' if not blockers else 'blocked'
 data = {
-    'schema_version': 1,
+    'schema_version': 2,
     'generated_at': datetime.now(timezone.utc).isoformat(),
     'status': status,
+    'mode': 'push' if do_push == '1' else 'local',
     'repo_root': repo_root,
     'git': {
         'is_repo': repo_ok == '1',
@@ -136,7 +151,7 @@ data = {
         'bash': bash_cmd or None,
         'sha256': sha_cmd or None,
     },
-    'repo_state_writable': write_ok == '1',
+    'state_dir_writable': write_ok == '1',
     'missing_scripts': [x for x in missing_scripts.split() if x],
     'source': {
         'status': source_status,
@@ -164,14 +179,16 @@ b=json.load(open(sys.argv[1], encoding='utf-8'))['blockers']
 for x in b:
     hints={
       'not_git_repository':'Run this inside the cloned Ugreen-server repository.',
-      'python3_missing':'Install/enable Python 3 using the NAS-supported package mechanism.',
       'git_missing':'Install/enable Git using the NAS-supported package mechanism.',
       'bash_missing':'Use a shell environment that provides bash.',
       'sha256_utility_missing':'Provide sha256sum or shasum.',
-      'repo_state_not_writable':'Fix permissions for the repository working tree only.',
+      'state_dir_not_writable':'Set AEGIS_STATE_DIR to a writable persistent local path.',
       'required_scripts_missing':'git pull --ff-only on main, then rerun.',
       'detached_head':'Checkout main or another named branch.',
       'unexpected_origin':'Verify the repository origin before any push.',
+      'origin_missing_for_push':'Configure the expected origin before using --push.',
+      'origin_not_allowed_for_push':'Use the expected thepointer1982-maker/Ugreen-server origin.',
+      'push_requires_main':'Checkout main and update it before using --push.',
       'source_no_valid_source':'Locate AEGIS reports/latest.json or set AEGIS_SOURCE_ROOT explicitly.',
       'source_invalid_explicit_source':'Correct or unset AEGIS_SOURCE_ROOT.',
       'source_ambiguous':'Set AEGIS_SOURCE_ROOT to the intended AEGIS root.',
