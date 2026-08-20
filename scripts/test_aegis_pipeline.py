@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -30,7 +31,7 @@ class AegisPipelineTests(unittest.TestCase):
             shutil.copy2(SCRIPTS / name, repo / "scripts" / name)
         return repo
 
-    def make_source(self, td: Path, *, deep: dict | None = None) -> Path:
+    def make_source(self, td: Path, *, deep: Optional[dict] = None) -> Path:
         src = td / "source"
         latest = {
             "generated_at": "2026-08-20T12:00:00+00:00",
@@ -43,7 +44,7 @@ class AegisPipelineTests(unittest.TestCase):
             write_json(src / "reports" / "deepdiag.json", deep)
         return src
 
-    def run_export(self, repo: Path, src: Path) -> subprocess.CompletedProcess[str]:
+    def run_export(self, repo: Path, src: Path) -> subprocess.CompletedProcess:
         env = os.environ.copy()
         env["AEGIS_SOURCE_ROOT"] = str(src)
         return subprocess.run(
