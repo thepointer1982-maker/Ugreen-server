@@ -36,14 +36,23 @@ copy_if_present "$SOURCE_ROOT/data/history.jsonl" "$STAGE/scores/history.jsonl"
 copy_if_present "$SOURCE_ROOT/reports/dashboard.html" "$STAGE/dashboard/index.html"
 copy_if_present "$LATEST_SRC" "$STAGE/dashboard/status.json"
 
-# Fail closed on mixed evidence. Deepdiag must correlate with latest by a shared
-# run/session identifier, or by timestamps no more than 15 minutes apart.
-python3 - "$STAGE/scores/latest.json" "$STAGE/scores/deepdiag.json" "$STAGE/scores/export-session.json" <<'PY'
+# Fail closed on stale/future/mixed evidence and record provenance metadata.
+AEGIS_MAX_EVIDENCE_AGE_SECONDS="${AEGIS_MAX_EVIDENCE_AGE_SECONDS:-21600}"
+AEGIS_MAX_FUTURE_SKEW_SECONDS="${AEGIS_MAX_FUTURE_SKEW_SECONDS:-300}"
+python3 - "$STAGE/scores/latest.json" "$STAGE/scores/deepdiag.json" "$STAGE/scores/export-session.json" "$AEGIS_MAX_EVIDENCE_AGE_SECONDS" "$AEGIS_MAX_FUTURE_SKEW_SECONDS" <<'PY'
 import json, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-latest_p, deep_p, session_p = map(Path, sys.argv[1:])
+latest_p, deep_p, session_p = map(Path, sys.argv[1:4])
+try:
+    max_age = int(sys.argv[4])
+    max_future = int(sys.argv[5])
+except ValueError:
+    raise SystemExit('freshness limits must be integers')
+if max_age <= 0 or max_future < 0:
+    raise SystemExit('freshness limits out of range')
+
 latest = json.loads(latest_p.read_text(encoding='utf-8'))
 required = ('generated_at', 'network_score', 'devices')
 if any(k not in latest for k in required):
@@ -53,6 +62,17 @@ if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= fl
     raise SystemExit('latest.json network_score invalid')
 if not isinstance(latest['devices'], list):
     raise SystemExit('latest.json devices invalid')
+
+ids = []
+for i, dev in enumerate(latest['devices']):
+    if not isinstance(dev, dict):
+        raise SystemExit(f'latest.json devices[{i}] invalid')
+    dev_id = dev.get('id')
+    if not isinstance(dev_id, str) or not dev_id.strip():
+        raise SystemExit(f'latest.json devices[{i}].id missing')
+    ids.append(dev_id.strip())
+if len(ids) != len(set(ids)):
+    raise SystemExit('latest.json duplicate device ids')
 
 def parse_ts(v):
     if not isinstance(v, str) or not v.strip():
@@ -69,6 +89,12 @@ def parse_ts(v):
 latest_ts = parse_ts(latest.get('generated_at'))
 if latest_ts is None:
     raise SystemExit('latest.json generated_at invalid')
+now = datetime.now(timezone.utc)
+age = (now - latest_ts).total_seconds()
+if age > max_age:
+    raise SystemExit(f'stale evidence: latest.json age {age:.0f}s exceeds {max_age}s')
+if age < -max_future:
+    raise SystemExit(f'future evidence: latest.json is {-age:.0f}s ahead, limit {max_future}s')
 
 correlation = 'latest_only'
 deep = None
@@ -99,21 +125,33 @@ if deep_p.exists():
             raise SystemExit(f'mixed evidence: latest/deepdiag timestamps differ by {delta:.0f}s')
         correlation = 'timestamp_window_900s'
 
+source_ids = {}
+for key in ('run_id', 'session_id', 'probe_session_id', 'evidence_id'):
+    if latest.get(key) is not None:
+        source_ids[key] = str(latest[key])
+
 files = ['latest.json']
 for name in ('deepdiag.json', 'history.jsonl'):
     if (latest_p.parent / name).exists():
         files.append(name)
 session = {
-    'schema_version': 1,
-    'exported_at': datetime.now(timezone.utc).isoformat(),
+    'schema_version': 2,
+    'exported_at': now.isoformat(),
     'source_generated_at': latest.get('generated_at'),
+    'source_ids': source_ids,
+    'freshness': {
+        'age_seconds_at_export': max(0.0, age),
+        'max_age_seconds': max_age,
+        'max_future_skew_seconds': max_future,
+    },
+    'device_count': len(ids),
+    'device_ids': ids,
     'correlation': correlation,
     'files': files,
 }
 session_p.write_text(json.dumps(session, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 PY
 
-# Refuse obvious secret material in the staged export before touching repo data.
 if grep -RIEq '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]+|github_pat_|sk-[A-Za-z0-9]|password[[:space:]]*[:=]|token[[:space:]]*[:=])' "$STAGE/scores" "$STAGE/dashboard" 2>/dev/null; then
   echo "AEGIS export aborted: possible secret material detected" >&2
   exit 2
@@ -138,8 +176,6 @@ hash_file() {
   done
 )
 
-# Only after staging, validation, correlation and secret checks succeed do we
-# replace generated artifacts. This prevents partial/stale mixed exports.
 for path in \
   "$SCORES_DIR/latest.json" \
   "$SCORES_DIR/deepdiag.json" \
