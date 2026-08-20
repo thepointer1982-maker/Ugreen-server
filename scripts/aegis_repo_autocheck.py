@@ -18,6 +18,15 @@ def load_json(path: Path):
         return json.load(f)
 
 
+def safe_float(value, default=0.0) -> float:
+    try:
+        if value is None or value == "":
+            return float(default)
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
 def priority(score: float, reachable: bool, anomaly: float) -> str:
     if not reachable or score < 40 or anomaly >= 90:
         return "P0"
@@ -36,11 +45,17 @@ def main() -> int:
         return 3
 
     devices = latest.get("devices", [])
+    if not isinstance(devices, list):
+        print("AEGIS_AUTOCHECK status=invalid_devices")
+        return 4
+
     findings = []
     for d in devices:
-        score = float(d.get("score", 0))
+        if not isinstance(d, dict):
+            continue
+        score = safe_float(d.get("score"))
         reachable = bool(d.get("reachable", False))
-        anomaly = float(d.get("anomaly_score", 0))
+        anomaly = safe_float(d.get("anomaly_score"))
         p = priority(score, reachable, anomaly)
         if p != "P3":
             findings.append({
@@ -55,8 +70,8 @@ def main() -> int:
     order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
     findings.sort(key=lambda x: (order[x["priority"]], x["score"]))
 
-    network_score = float(latest.get("network_score", 0))
-    deep_score = float((deepdiag or {}).get("deepdiag_score", latest.get("deepdiag_score", 0) or 0))
+    network_score = safe_float(latest.get("network_score"))
+    deep_score = safe_float((deepdiag or {}).get("deepdiag_score", latest.get("deepdiag_score")))
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "network_score": network_score,
@@ -75,10 +90,13 @@ def main() -> int:
 
     if findings:
         FIXES.mkdir(parents=True, exist_ok=True)
+        evidence = ["scores/latest.json"]
+        if (SCORES / "deepdiag.json").exists():
+            evidence.append("scores/deepdiag.json")
         fix = {
             "package": "fix-package-002",
             "generated_at": report["generated_at"],
-            "evidence": ["scores/latest.json", "scores/deepdiag.json"],
+            "evidence": evidence,
             "findings": findings,
             "safety": {
                 "automatic_remote_writes": False,
