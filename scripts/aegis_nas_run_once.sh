@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # Guarded one-shot runner for the UGREEN AEGIS export path.
 # Default: local-only. It detects/exports real AEGIS data, verifies it, runs
-# the local autocheck, and stages nothing remotely. --commit and --push are
+# the local autocheck, and performs no remote write. --commit and --push are
 # explicit opt-ins; --push implies --commit.
 
 DO_COMMIT=0
@@ -17,7 +17,7 @@ Usage: scripts/aegis_nas_run_once.sh [--repo-root PATH] [--commit] [--push]
 Default behavior is local-only and performs:
   source detect -> export -> schema/hash verification -> local autocheck
 
---commit     Commit exported score/dashboard/autocheck/fix artifacts locally.
+--commit     Commit only generated AEGIS artifacts locally.
 --push       Commit if needed and push the current branch (explicit remote write).
 --repo-root  Repository root (default: current directory).
 EOF
@@ -42,12 +42,42 @@ cd "$REPO_ROOT"
 [[ -f scripts/aegis_repo_autocheck.py ]] || { echo "AEGIS_RUN status=error reason=missing_autocheck" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "AEGIS_RUN status=error reason=python3_missing" >&2; exit 2; }
 
-# Do not mix a real export with unrelated local edits.
-if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
-  echo "AEGIS_RUN status=blocked reason=dirty_worktree" >&2
-  git status --short >&2
-  exit 10
-fi
+# Exact files this runner is allowed to create/update/commit. This lets a user
+# run once for review and then rerun with --commit/--push without treating the
+# generated artifacts themselves as an unrelated dirty worktree.
+ARTIFACTS=(
+  scores/latest.json
+  scores/deepdiag.json
+  scores/history.jsonl
+  scores/manifest.sha256
+  dashboard/index.html
+  dashboard/status.json
+  dashboard/autocheck.json
+  fixes/done/fix-package-002.json
+)
+
+# Fail closed if any pre-existing change is outside the generated artifact set.
+python3 - "${ARTIFACTS[@]}" <<'PY'
+import subprocess, sys
+allowed = set(sys.argv[1:])
+out = subprocess.check_output(
+    ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
+    text=True,
+)
+bad = []
+for line in out.splitlines():
+    if not line:
+        continue
+    path = line[3:]
+    if ' -> ' in path:
+        path = path.split(' -> ', 1)[1]
+    if path not in allowed:
+        bad.append(line)
+if bad:
+    print('AEGIS_RUN status=blocked reason=unrelated_dirty_worktree', file=sys.stderr)
+    print('\n'.join(bad), file=sys.stderr)
+    raise SystemExit(10)
+PY
 
 echo "AEGIS_RUN phase=detect_export"
 bash scripts/aegis_source_detect.sh --export --repo-root "$REPO_ROOT"
@@ -84,16 +114,16 @@ if [[ -s scores/manifest.sha256 ]]; then
   echo "AEGIS_RUN phase=verify_hashes"
   if command -v sha256sum >/dev/null 2>&1; then
     (cd scores && sha256sum -c manifest.sha256)
-  else
+  elif command -v shasum >/dev/null 2>&1; then
     (cd scores && shasum -a 256 -c manifest.sha256)
+  else
+    echo "AEGIS_RUN status=error reason=no_sha256_utility" >&2
+    exit 4
   fi
 fi
 
 echo "AEGIS_RUN phase=autocheck"
 python3 scripts/aegis_repo_autocheck.py
-
-# Restrict commit scope to generated AEGIS artifacts only.
-ARTIFACTS=(scores dashboard fixes/done/fix-package-002.json)
 
 echo "AEGIS_RUN phase=summary"
 python3 - <<'PY'
@@ -111,13 +141,19 @@ PY
 
 if [[ "$DO_COMMIT" -eq 0 ]]; then
   echo "AEGIS_RUN status=ready_local_only"
-  echo "Review: git diff -- scores dashboard fixes/done/fix-package-002.json"
+  echo "Review: git diff -- ${ARTIFACTS[*]}"
   echo "To commit locally: bash scripts/aegis_nas_run_once.sh --commit"
   echo "To commit and push: bash scripts/aegis_nas_run_once.sh --push"
   exit 0
 fi
 
-git add -- "${ARTIFACTS[@]}"
+# Add only files that actually exist; never stage directory-wide changes.
+TO_ADD=()
+for path in "${ARTIFACTS[@]}"; do
+  [[ -e "$path" ]] && TO_ADD+=("$path")
+done
+[[ ${#TO_ADD[@]} -gt 0 ]] && git add -- "${TO_ADD[@]}"
+
 if git diff --cached --quiet; then
   echo "AEGIS_RUN status=no_changes"
 else
