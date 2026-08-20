@@ -6,6 +6,19 @@ on:
     paths:
       - 'scores/**'
       - 'scripts/aegis_repo_autocheck.py'
+      - 'scripts/aegis_export_collect.sh'
+      - 'scripts/aegis_source_detect.sh'
+      - 'scripts/aegis_nas_run_once.sh'
+      - 'scripts/test_aegis_pipeline.py'
+      - '.github/workflows/aegis-autocheck.yml'
+  pull_request:
+    paths:
+      - 'scores/**'
+      - 'scripts/aegis_repo_autocheck.py'
+      - 'scripts/aegis_export_collect.sh'
+      - 'scripts/aegis_source_detect.sh'
+      - 'scripts/aegis_nas_run_once.sh'
+      - 'scripts/test_aegis_pipeline.py'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
 
@@ -13,7 +26,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: aegis-autocheck-main
+  group: aegis-autocheck-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,6 +35,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Run AEGIS pipeline regression tests
+        run: python3 scripts/test_aegis_pipeline.py
 
       - name: Detect real score data
         id: detect
@@ -33,6 +49,13 @@ jobs:
             echo 'has_data=false' >> "$GITHUB_OUTPUT"
             echo 'AEGIS_AUTOCHECK status=no_data'
           fi
+
+      - name: Require complete export envelope
+        if: steps.detect.outputs.has_data == 'true'
+        shell: bash
+        run: |
+          test -s scores/export-session.json || { echo 'Missing scores/export-session.json' >&2; exit 1; }
+          test -s scores/manifest.sha256 || { echo 'Missing scores/manifest.sha256' >&2; exit 1; }
 
       - name: Validate score snapshot
         if: steps.detect.outputs.has_data == 'true'
@@ -66,25 +89,25 @@ jobs:
       - name: Verify exported hashes
         if: steps.detect.outputs.has_data == 'true'
         shell: bash
-        run: |
-          if [[ -s scores/manifest.sha256 ]]; then
-            (cd scores && sha256sum -c manifest.sha256)
-          else
-            echo 'No manifest present; continuing with schema validation only.'
-          fi
+        run: (cd scores && sha256sum -c manifest.sha256)
 
       - name: Run AEGIS deep autocheck
         if: steps.detect.outputs.has_data == 'true'
         run: python3 scripts/aegis_repo_autocheck.py
 
       - name: Commit generated diagnosis and fix package
-        if: steps.detect.outputs.has_data == 'true'
+        if: github.event_name == 'push' && steps.detect.outputs.has_data == 'true'
         shell: bash
         run: |
           git config user.name 'aegis-autocheck[bot]'
           git config user.email 'aegis-autocheck@users.noreply.github.com'
-          [[ -f dashboard/autocheck.json ]] && git add dashboard/autocheck.json
-          [[ -f fixes/done/fix-package-002.json ]] && git add fixes/done/fix-package-002.json
+          # Stage only bot-generated outputs. Include a deletion only when that
+          # path is already tracked; never broaden staging to other files.
+          for path in dashboard/autocheck.json fixes/done/fix-package-002.json; do
+            if [[ -e "$path" ]] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+              git add -A -- "$path"
+            fi
+          done
           if git diff --cached --quiet; then
             echo 'No generated changes.'
             exit 0

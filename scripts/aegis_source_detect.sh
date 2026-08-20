@@ -14,7 +14,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/aegis_source_detect.sh [--export] [--repo-root PATH] [--max-depth N]
 
-Default mode is read-only and prints the best valid AEGIS source root.
+Default mode is read-only and prints the unique valid AEGIS source root.
+If AEGIS_SOURCE_ROOT is set, it is a strict override: only that path is checked.
 --export      Run scripts/aegis_export_collect.sh after a unique valid source is found.
 --repo-root   Repository root used by --export (default: current directory).
 --max-depth   Maximum bounded search depth below candidate roots (default: 6).
@@ -32,50 +33,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$MAX_DEPTH" =~ ^[1-9][0-9]*$ ]] || { echo "max-depth must be a positive integer" >&2; exit 64; }
+command -v python3 >/dev/null 2>&1 || { echo "AEGIS_SOURCE_DETECT status=error reason=python3_missing" >&2; exit 2; }
 
-# Explicit root wins and is still validated.
-CANDIDATE_ROOTS=()
-if [[ -n "${AEGIS_SOURCE_ROOT:-}" ]]; then
-  CANDIDATE_ROOTS+=("$AEGIS_SOURCE_ROOT")
-fi
-
-for root in \
-  /var/lib/aegis-device-ai \
-  /var/lib/aegis \
-  /opt/aegis \
-  /srv/aegis \
-  /volume1/aegis \
-  /volume1/docker/aegis \
-  /volume2/aegis \
-  "$HOME/aegis" \
-  "$HOME/AEGIS-Device-AI"; do
-  [[ -e "$root" ]] && CANDIDATE_ROOTS+=("$root")
-done
-
-# Bounded discovery only. No network calls and no writes.
-for parent in /var/lib /opt /srv /volume1 /volume2 "$HOME"; do
-  [[ -d "$parent" ]] || continue
-  while IFS= read -r -d '' latest; do
-    CANDIDATE_ROOTS+=("${latest%/reports/latest.json}")
-  done < <(find "$parent" -maxdepth "$MAX_DEPTH" -type f -path '*/reports/latest.json' -print0 2>/dev/null || true)
-done
-
-# De-duplicate while preserving order.
-UNIQUE=()
-declare -A SEEN=()
-for root in "${CANDIDATE_ROOTS[@]}"; do
-  [[ -n "$root" ]] || continue
-  if [[ -z "${SEEN[$root]:-}" ]]; then
-    UNIQUE+=("$root")
-    SEEN[$root]=1
-  fi
-done
-
-VALID=()
-for root in "${UNIQUE[@]}"; do
-  latest="$root/reports/latest.json"
-  [[ -f "$latest" ]] || continue
-  if python3 - "$latest" <<'PY'
+validate_root() {
+  local root="$1"
+  local latest="$root/reports/latest.json"
+  [[ -f "$latest" ]] || return 1
+  python3 - "$latest" <<'PY'
 import json, sys
 p = sys.argv[1]
 try:
@@ -92,7 +56,56 @@ if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= fl
 if not isinstance(d['devices'], list):
     raise SystemExit(1)
 PY
-  then
+}
+
+CANDIDATE_ROOTS=()
+
+# Explicit root is a strict fail-closed override. Never silently fall back to
+# another AEGIS tree when the operator selected a source explicitly.
+if [[ -n "${AEGIS_SOURCE_ROOT:-}" ]]; then
+  if ! validate_root "$AEGIS_SOURCE_ROOT"; then
+    echo "AEGIS_SOURCE_DETECT status=invalid_explicit_source" >&2
+    printf 'source_root=%q\n' "$AEGIS_SOURCE_ROOT" >&2
+    exit 4
+  fi
+  CANDIDATE_ROOTS=("$AEGIS_SOURCE_ROOT")
+else
+  for root in \
+    /var/lib/aegis-device-ai \
+    /var/lib/aegis \
+    /opt/aegis \
+    /srv/aegis \
+    /volume1/aegis \
+    /volume1/docker/aegis \
+    /volume2/aegis \
+    "$HOME/aegis" \
+    "$HOME/AEGIS-Device-AI"; do
+    [[ -e "$root" ]] && CANDIDATE_ROOTS+=("$root")
+  done
+
+  # Bounded discovery only. No network calls and no writes.
+  for parent in /var/lib /opt /srv /volume1 /volume2 "$HOME"; do
+    [[ -d "$parent" ]] || continue
+    while IFS= read -r -d '' latest; do
+      CANDIDATE_ROOTS+=("${latest%/reports/latest.json}")
+    done < <(find "$parent" -maxdepth "$MAX_DEPTH" -type f -path '*/reports/latest.json' -print0 2>/dev/null || true)
+  done
+fi
+
+# De-duplicate while preserving order.
+UNIQUE=()
+declare -A SEEN=()
+for root in "${CANDIDATE_ROOTS[@]}"; do
+  [[ -n "$root" ]] || continue
+  if [[ -z "${SEEN[$root]:-}" ]]; then
+    UNIQUE+=("$root")
+    SEEN[$root]=1
+  fi
+done
+
+VALID=()
+for root in "${UNIQUE[@]}"; do
+  if validate_root "$root"; then
     VALID+=("$root")
   fi
 done
