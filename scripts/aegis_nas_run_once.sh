@@ -15,7 +15,7 @@ usage() {
 Usage: scripts/aegis_nas_run_once.sh [--repo-root PATH] [--commit] [--push]
 
 Default behavior is local-only and performs:
-  source detect -> export -> schema/hash verification -> local autocheck
+  source detect -> atomic export -> schema/session/hash verification -> local autocheck
 
 --commit     Commit only generated AEGIS artifacts locally.
 --push       Commit if needed and push the current branch (explicit remote write).
@@ -42,13 +42,12 @@ cd "$REPO_ROOT"
 [[ -f scripts/aegis_repo_autocheck.py ]] || { echo "AEGIS_RUN status=error reason=missing_autocheck" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "AEGIS_RUN status=error reason=python3_missing" >&2; exit 2; }
 
-# Exact files this runner is allowed to create/update/commit. This lets a user
-# run once for review and then rerun with --commit/--push without treating the
-# generated artifacts themselves as an unrelated dirty worktree.
+# Exact files this runner is allowed to create/update/delete/commit.
 ARTIFACTS=(
   scores/latest.json
   scores/deepdiag.json
   scores/history.jsonl
+  scores/export-session.json
   scores/manifest.sha256
   dashboard/index.html
   dashboard/status.json
@@ -83,6 +82,8 @@ echo "AEGIS_RUN phase=detect_export"
 bash scripts/aegis_source_detect.sh --export --repo-root "$REPO_ROOT"
 
 [[ -f scores/latest.json ]] || { echo "AEGIS_RUN status=error reason=latest_missing_after_export" >&2; exit 11; }
+[[ -f scores/export-session.json ]] || { echo "AEGIS_RUN status=error reason=export_session_missing" >&2; exit 11; }
+[[ -s scores/manifest.sha256 ]] || { echo "AEGIS_RUN status=error reason=manifest_missing_or_empty" >&2; exit 11; }
 
 echo "AEGIS_RUN phase=validate_schema"
 python3 - <<'PY'
@@ -110,16 +111,14 @@ for i, dev in enumerate(d['devices']):
 print('AEGIS schema baseline validation OK')
 PY
 
-if [[ -s scores/manifest.sha256 ]]; then
-  echo "AEGIS_RUN phase=verify_hashes"
-  if command -v sha256sum >/dev/null 2>&1; then
-    (cd scores && sha256sum -c manifest.sha256)
-  elif command -v shasum >/dev/null 2>&1; then
-    (cd scores && shasum -a 256 -c manifest.sha256)
-  else
-    echo "AEGIS_RUN status=error reason=no_sha256_utility" >&2
-    exit 4
-  fi
+echo "AEGIS_RUN phase=verify_hashes"
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd scores && sha256sum -c manifest.sha256)
+elif command -v shasum >/dev/null 2>&1; then
+  (cd scores && shasum -a 256 -c manifest.sha256)
+else
+  echo "AEGIS_RUN status=error reason=no_sha256_utility" >&2
+  exit 4
 fi
 
 echo "AEGIS_RUN phase=autocheck"
@@ -132,6 +131,7 @@ from pathlib import Path
 latest = json.loads(Path('scores/latest.json').read_text(encoding='utf-8'))
 auto = Path('dashboard/autocheck.json')
 report = json.loads(auto.read_text(encoding='utf-8')) if auto.exists() else {}
+print(f"evidence_verified={report.get('evidence_verified', False)}")
 print(f"network_score={latest.get('network_score')}")
 print(f"device_count={len(latest.get('devices', []))}")
 print(f"deepdiag_score={report.get('deepdiag_score', 'unavailable')}")
@@ -147,12 +147,12 @@ if [[ "$DO_COMMIT" -eq 0 ]]; then
   exit 0
 fi
 
-# Add only files that actually exist; never stage directory-wide changes.
-TO_ADD=()
+# Stage only allowlisted generated paths, including deletions of stale artifacts.
 for path in "${ARTIFACTS[@]}"; do
-  [[ -e "$path" ]] && TO_ADD+=("$path")
+  if [[ -e "$path" ]] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+    git add -A -- "$path"
+  fi
 done
-[[ ${#TO_ADD[@]} -gt 0 ]] && git add -- "${TO_ADD[@]}"
 
 if git diff --cached --quiet; then
   echo "AEGIS_RUN status=no_changes"
