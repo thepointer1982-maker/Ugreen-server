@@ -1,0 +1,92 @@
+name: AEGIS Autocheck
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scores/**'
+      - 'scripts/aegis_repo_autocheck.py'
+      - '.github/workflows/aegis-autocheck.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aegis-autocheck-main
+  cancel-in-progress: true
+
+jobs:
+  autocheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect real score data
+        id: detect
+        shell: bash
+        run: |
+          if [[ -f scores/latest.json ]]; then
+            echo 'has_data=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_data=false' >> "$GITHUB_OUTPUT"
+            echo 'AEGIS_AUTOCHECK status=no_data'
+          fi
+
+      - name: Validate score snapshot
+        if: steps.detect.outputs.has_data == 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('scores/latest.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          required = ('generated_at', 'network_score', 'devices')
+          missing = [k for k in required if k not in d]
+          if missing:
+              raise SystemExit(f'missing required fields: {missing}')
+          score = d['network_score']
+          if not isinstance(score, (int, float)) or isinstance(score, bool) or not (0 <= float(score) <= 100):
+              raise SystemExit('network_score must be numeric 0..100')
+          if not isinstance(d['devices'], list):
+              raise SystemExit('devices must be a list')
+          for i, dev in enumerate(d['devices']):
+              if not isinstance(dev, dict):
+                  raise SystemExit(f'devices[{i}] must be an object')
+              if 'id' not in dev or 'score' not in dev:
+                  raise SystemExit(f'devices[{i}] missing id/score')
+              s = dev['score']
+              if not isinstance(s, (int, float)) or isinstance(s, bool) or not (0 <= float(s) <= 100):
+                  raise SystemExit(f'devices[{i}].score must be numeric 0..100')
+          print('AEGIS schema baseline validation OK')
+          PY
+
+      - name: Verify exported hashes
+        if: steps.detect.outputs.has_data == 'true'
+        shell: bash
+        run: |
+          if [[ -s scores/manifest.sha256 ]]; then
+            (cd scores && sha256sum -c manifest.sha256)
+          else
+            echo 'No manifest present; continuing with schema validation only.'
+          fi
+
+      - name: Run AEGIS deep autocheck
+        if: steps.detect.outputs.has_data == 'true'
+        run: python3 scripts/aegis_repo_autocheck.py
+
+      - name: Commit generated diagnosis and fix package
+        if: steps.detect.outputs.has_data == 'true'
+        shell: bash
+        run: |
+          git config user.name 'aegis-autocheck[bot]'
+          git config user.email 'aegis-autocheck@users.noreply.github.com'
+          git add dashboard/autocheck.json fixes/done/fix-package-002.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo 'No generated changes.'
+            exit 0
+          fi
+          git commit -m 'AEGIS autocheck: update diagnosis artifacts'
+          git push
