@@ -1,0 +1,15 @@
+services:
+  aegis-score-bus-mcp:
+    build: .
+    container_name: aegis-score-bus-mcp
+    restart: unless-stopped
+    network_mode: none
+    environment:
+      AEGIS_UGREEN_REPO: /evidence/Ugreen-server
+      AEGIS_OPENJARVIS_REPO: /evidence/OpenJarvis-main
+      AEGIS_DRIVE_HUB: /evidence/00_KI-Agenten_Datenhub
+    volumes:
+      - /srv/aegis/repos/Ugreen-server:/evidence/Ugreen-server:ro
+      - /srv/aegis/repos/OpenJarvis-main:/evidence/OpenJarvis-main:ro
+      - /srv/aegis/drive/00_KI-Agenten_Datenhub:/evidence/00_KI-Agenten_Datenhub:ro
+    stdin_open: true
