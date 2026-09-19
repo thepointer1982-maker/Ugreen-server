@@ -40,12 +40,52 @@ def main() -> None:
         assert cur["status"] == "ok"
         digest = cur["pointer"]["sha256"]
 
+        candidate2 = root / "candidate2.json"
+        candidate2.write_text(
+            json.dumps(attach_provenance({"score": 0.95}, kind="eval-candidate")),
+            encoding="utf-8",
+        )
+        staged = mod.stage_provisional(
+            candidate2,
+            kind="model-routing",
+            required_passes=2,
+            max_failures=1,
+        )
+        assert staged["status"] == "provisional"
+        assert mod.current()["pointer"]["sha256"] == digest
+        probation1 = mod.observe_provisional(passed=True, evidence={"run": 1})
+        assert probation1["status"] == "probation"
+        probation2 = mod.observe_provisional(passed=True, evidence={"run": 2})
+        assert probation2["status"] == "confirmed"
+        new_digest = mod.current()["pointer"]["sha256"]
+        assert new_digest != digest
+
         allowed_root = root / "allowed"
         mod.DEFAULT_RESTORE_ROOTS = [allowed_root]
         dest = allowed_root / "active.json"
         restored = mod.restore(dest)
         assert restored["status"] == "restored"
         assert json.loads(dest.read_text())["_provenance"]["sha256"] == digest
+
+        candidate3 = root / "candidate3.json"
+        candidate3.write_text(
+            json.dumps(attach_provenance({"score": 0.96}, kind="eval-candidate")),
+            encoding="utf-8",
+        )
+        staged2 = mod.stage_provisional(
+            candidate3,
+            kind="model-routing",
+            required_passes=3,
+            max_failures=0,
+        )
+        assert staged2["status"] == "provisional"
+        rejected = mod.observe_provisional(
+            passed=False,
+            evidence={"run": "regression"},
+            rollback_destination=dest,
+        )
+        assert rejected["status"] == "rejected"
+        assert rejected["rollback"]["status"] in {"restored", "already-current"}
 
         outside = root / "outside" / "active.json"
         blocked_restore = mod.restore(outside)
