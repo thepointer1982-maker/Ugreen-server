@@ -50,6 +50,32 @@ def main():
         assert fast["trace_count"] == 0
         assert fast["eligible_for_routing"] is False
         assert "coder" not in guarded["best_by_agent"]
+
+        now = 1_000_000.0
+        fresh_traces = [
+            {"agent":"coder","model":"fresh","outcome":"success","feedback":0.9,"latency":1.0,"tokens":10,"timestamp":now-100}
+            for _ in range(3)
+        ]
+        stale_traces = [
+            {"agent":"coder","model":"stale","outcome":"success","feedback":1.0,"latency":0.1,"tokens":10,"timestamp":now-10000}
+            for _ in range(10)
+        ]
+        undated_traces = [
+            {"agent":"coder","model":"legacy-undated","outcome":"success","feedback":1.0,"latency":0.1,"tokens":10,"timestamp":None}
+            for _ in range(10)
+        ]
+        freshness = mod.build_matrix(
+            fresh_traces + stale_traces + undated_traces,
+            [],
+            3,
+            max_age_seconds=3600,
+            now_ts=now,
+        )
+        rows = {r["model"]: r for r in freshness["rows"]}
+        assert rows["fresh"]["eligible_for_routing"] is True
+        assert "stale" not in rows
+        assert rows["legacy-undated"]["eligible_for_routing"] is False
+        assert freshness["best_by_agent"]["coder"]["model"] == "fresh"
     print("AEGIS MODEL AGENT MATRIX TESTS PASS")
 
 if __name__=="__main__": main()
