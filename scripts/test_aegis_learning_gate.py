@@ -22,6 +22,15 @@ def main():
     r=mod.evaluate({},{"score":0.8})
     assert not r.accepted and r.status=="blocked"
 
+    r=mod.evaluate({"score":70.0},{"score":73.0},min_improvement=0.02,score_scale=100.0)
+    assert r.accepted and abs(r.improvement-0.03)<1e-9
+
+    r=mod.evaluate({"score":70.0},{"score":71.0},min_improvement=0.02,score_scale=100.0)
+    assert not r.accepted and r.reason=="insufficient-improvement"
+
+    r=mod.evaluate({"score":1.0},{"score":2.0},score_scale=0.0)
+    assert not r.accepted and r.reason=="invalid-score-scale"
+
     print("AEGIS LEARNING GATE TESTS PASS")
 
 if __name__=="__main__": main()
