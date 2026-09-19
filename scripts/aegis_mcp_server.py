@@ -13,6 +13,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
+from aegis_local_ai_miner import REPORT as AI_REPORT, main as _unused_ai_main
 
 REPO_ROOT = Path(os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])).resolve()
 mcp = MCPServer(
@@ -28,6 +29,16 @@ def _status() -> dict:
     if not STATUS_FILE.is_file():
         return {"status": "not-yet-measured", "hint": "Call run_guardian_cycle with repair=false first."}
     return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
+
+
+def _ai_report() -> dict:
+    if not AI_REPORT.is_file():
+        return {"status": "not-yet-mined", "hint": "Run scripts/aegis_local_ai_miner.py locally first."}
+    try:
+        value = json.loads(AI_REPORT.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except Exception as exc:
+        return {"status": "unreadable", "error": f"{type(exc).__name__}: {exc}"}
 
 
 def _cards(limit: int = 20) -> list[dict]:
@@ -50,6 +61,12 @@ def status_resource() -> str:
     return json.dumps(_status(), indent=2, ensure_ascii=False)
 
 
+@mcp.resource("aegis://local-ai")
+def ai_resource() -> str:
+    """Latest read-only local AI/protocol inventory."""
+    return json.dumps(_ai_report(), indent=2, ensure_ascii=False)
+
+
 @mcp.resource("aegis://learning-cards")
 def cards_resource() -> str:
     """Recent repair/diagnostic learning cards."""
@@ -60,6 +77,12 @@ def cards_resource() -> str:
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
     return _status()
+
+
+@mcp.tool()
+def local_ai_inventory() -> dict:
+    """Return the latest local AI/protocol evidence report without modifying the machine."""
+    return _ai_report()
 
 
 @mcp.tool()
