@@ -23,7 +23,7 @@ log() {
 # the lock is older than two hours.
 acquire_lock() {
   if mkdir "$LOCK_DIR" 2>/dev/null; then
-    printf 'pid=%s\nboot_id=%s\n' "$" "$BOOT_ID" > "$LOCK_OWNER"
+    printf 'pid=%s\nboot_id=%s\n' "$$" "$BOOT_ID" > "$LOCK_OWNER"
     chmod 600 "$LOCK_OWNER" 2>/dev/null || true
     return 0
   fi
@@ -67,7 +67,7 @@ acquire_lock() {
     log 'status=skip reason=lock_raced'
     return 1
   }
-  printf 'pid=%s\nboot_id=%s\n' "$" "$BOOT_ID" > "$LOCK_OWNER"
+  printf 'pid=%s\nboot_id=%s\n' "$$" "$BOOT_ID" > "$LOCK_OWNER"
   chmod 600 "$LOCK_OWNER" 2>/dev/null || true
   log 'status=warning reason=stale_lock_recovered'
   return 0
