@@ -12,7 +12,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from aegis_last_known_good import promote
+from aegis_last_known_good import stage_provisional
 from aegis_provenance import attach_provenance, verify_provenance
 
 
@@ -237,7 +237,7 @@ def main() -> int:
 
     if result.accepted and args.promote_kind:
         gate_sha = payload["_provenance"]["sha256"]
-        promotion = promote(
+        promotion = stage_provisional(
             args.candidate,
             kind=args.promote_kind,
             metadata={
@@ -246,12 +246,14 @@ def main() -> int:
                 "learning_gate_sha256": gate_sha,
             },
         )
-        if promotion.get("status") != "promoted":
+        if promotion.get("status") != "provisional":
             payload["accepted"] = False
             payload["status"] = "blocked"
-            payload["reason"] = "last-known-good-promotion-failed"
+            payload["reason"] = "provisional-staging-failed"
             payload["promotion"] = promotion
         else:
+            payload["status"] = "provisional"
+            payload["reason"] = "evidence-gate-passed-awaiting-probation"
             payload["promotion"] = promotion
 
         payload = attach_provenance(
