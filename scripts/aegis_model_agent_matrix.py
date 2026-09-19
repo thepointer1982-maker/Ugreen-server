@@ -133,9 +133,16 @@ def build_matrix(traces: list[dict[str,Any]], telemetry: list[dict[str,Any]], mi
         throughput_score = 0.5 if avg_throughput is None else bounded(avg_throughput / 30.0)
         efficiency = 0.5*latency_score + 0.5*throughput_score
 
-        sample_count = max(trace_n, tel_n)
-        confidence = bounded(math.log2(sample_count + 1) / math.log2(max(min_samples, 8) + 1))
-        composite = bounded((0.70*quality + 0.30*efficiency) * (0.5 + 0.5*confidence))
+        quality_confidence = bounded(
+            math.log2(trace_n + 1) / math.log2(max(min_samples, 8) + 1)
+        )
+        efficiency_confidence = bounded(
+            math.log2(tel_n + 1) / math.log2(max(min_samples, 8) + 1)
+        ) if tel_n else 0.0
+        confidence = 0.75 * quality_confidence + 0.25 * efficiency_confidence
+        composite = bounded(
+            (0.70*quality + 0.30*efficiency) * (0.5 + 0.5*confidence)
+        )
 
         rows.append({
             "agent":agent,
@@ -151,9 +158,11 @@ def build_matrix(traces: list[dict[str,Any]], telemetry: list[dict[str,Any]], mi
             "energy_joules":g["energy_sum"],
             "quality_score":round(quality,4),
             "efficiency_score":round(efficiency,4),
+            "quality_confidence":round(quality_confidence,4),
+            "efficiency_confidence":round(efficiency_confidence,4),
             "confidence":round(confidence,4),
             "composite_score":round(composite,4),
-            "eligible_for_routing": sample_count >= min_samples,
+            "eligible_for_routing": trace_n >= min_samples,
         })
 
     eligible = [r for r in rows if r["eligible_for_routing"]]
