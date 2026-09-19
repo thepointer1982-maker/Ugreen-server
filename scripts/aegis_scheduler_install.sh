@@ -88,7 +88,12 @@ SERVICE_CONTENT=""
 TIMER_CONTENT=""
 
 if [[ "$MODE" == user ]]; then
-  STATE_DIR="$HOME/.local/state/aegis-scheduler"
+  BASE_STATE="${XDG_STATE_HOME:-$HOME/.local/state}"
+  STATE_DIR="$BASE_STATE/aegis-scheduler"
+  REAL_CYCLE_STATE_DIR="$BASE_STATE/aegis-real-cycle"
+  AI_MINER_STATE_DIR="$BASE_STATE/aegis-ai-miner"
+  GUARDIAN_STATE_DIR="$BASE_STATE/aegis-guardian"
+  LKG_STATE_DIR="$BASE_STATE/aegis-last-known-good"
   SERVICE_CONTENT=$(cat <<EOF
 [Unit]
 Description=AEGIS verified local diagnostics export
@@ -99,6 +104,10 @@ WorkingDirectory=$REPO_ROOT
 Environment=AEGIS_REPO_ROOT=$REPO_ROOT
 Environment=AEGIS_SCHEDULER_PUSH=$ENABLE_PUSH
 Environment=AEGIS_SCHEDULER_STATE_DIR=$STATE_DIR
+Environment=AEGIS_REAL_CYCLE_STATE_DIR=$REAL_CYCLE_STATE_DIR
+Environment=AEGIS_AI_MINER_STATE_DIR=$AI_MINER_STATE_DIR
+Environment=AEGIS_GUARDIAN_STATE_DIR=$GUARDIAN_STATE_DIR
+Environment=AEGIS_LKG_STATE_DIR=$LKG_STATE_DIR
 ExecStart=/usr/bin/env bash $REPO_ROOT/scripts/aegis_scheduled_run.sh
 Nice=10
 IOSchedulingClass=best-effort
@@ -107,12 +116,22 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=$REPO_ROOT $STATE_DIR
+ReadWritePaths=$REPO_ROOT $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
 EOF
 )
 else
   RUN_GROUP="$(id -gn "$RUN_USER" 2>/dev/null || printf '%s' "$RUN_USER")"
-  STATE_DIR="$REPO_ROOT/.aegis-state/scheduler"
+  RUN_HOME="$(python3 - "$RUN_USER" <<'PY'
+import pwd, sys
+print(pwd.getpwnam(sys.argv[1]).pw_dir)
+PY
+)"
+  BASE_STATE="$RUN_HOME/.local/state"
+  STATE_DIR="$BASE_STATE/aegis-scheduler"
+  REAL_CYCLE_STATE_DIR="$BASE_STATE/aegis-real-cycle"
+  AI_MINER_STATE_DIR="$BASE_STATE/aegis-ai-miner"
+  GUARDIAN_STATE_DIR="$BASE_STATE/aegis-guardian"
+  LKG_STATE_DIR="$BASE_STATE/aegis-last-known-good"
   SERVICE_CONTENT=$(cat <<EOF
 [Unit]
 Description=AEGIS verified local diagnostics export
@@ -126,6 +145,10 @@ WorkingDirectory=$REPO_ROOT
 Environment=AEGIS_REPO_ROOT=$REPO_ROOT
 Environment=AEGIS_SCHEDULER_PUSH=$ENABLE_PUSH
 Environment=AEGIS_SCHEDULER_STATE_DIR=$STATE_DIR
+Environment=AEGIS_REAL_CYCLE_STATE_DIR=$REAL_CYCLE_STATE_DIR
+Environment=AEGIS_AI_MINER_STATE_DIR=$AI_MINER_STATE_DIR
+Environment=AEGIS_GUARDIAN_STATE_DIR=$GUARDIAN_STATE_DIR
+Environment=AEGIS_LKG_STATE_DIR=$LKG_STATE_DIR
 ExecStart=/usr/bin/env bash $REPO_ROOT/scripts/aegis_scheduled_run.sh
 Nice=10
 IOSchedulingClass=best-effort
@@ -134,7 +157,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=false
-ReadWritePaths=$REPO_ROOT
+ReadWritePaths=$REPO_ROOT $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
 LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
@@ -170,7 +193,7 @@ fi
 
 if [[ "$MODE" == user ]]; then
   UNIT_DIR="$HOME/.config/systemd/user"
-  mkdir -p "$UNIT_DIR" "$STATE_DIR"
+  mkdir -p "$UNIT_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
   printf '%s\n' "$SERVICE_CONTENT" > "$UNIT_DIR/aegis-export.service"
   printf '%s\n' "$TIMER_CONTENT" > "$UNIT_DIR/aegis-export.timer"
   systemctl --user daemon-reload
@@ -190,11 +213,11 @@ else
   PRIV=(sudo)
 fi
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 if [[ "$(id -u)" -eq 0 ]]; then
-  chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR"
+  chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 else
-  "${PRIV[@]}" chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR"
+  "${PRIV[@]}" chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 fi
 printf '%s\n' "$SERVICE_CONTENT" | "${PRIV[@]}" tee /etc/systemd/system/aegis-export.service >/dev/null
 printf '%s\n' "$TIMER_CONTENT" | "${PRIV[@]}" tee /etc/systemd/system/aegis-export.timer >/dev/null
