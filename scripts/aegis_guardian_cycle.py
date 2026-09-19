@@ -188,7 +188,7 @@ def classify(failures: int, preflight_rc: int, cycle_rc: int | None) -> tuple[st
     return "healthy", "verified-cycle"
 
 
-def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
+def execute(repo: Path, repair: bool = False, *, run_cycle: bool = True) -> dict[str, Any]:
     repo = repo.resolve()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     scheduler_dir = Path(os.environ.get("AEGIS_SCHEDULER_STATE_DIR", Path.home() / ".local/state/aegis-scheduler"))
@@ -208,10 +208,12 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
 
     cycle_rc: int | None = None
     cycle_tail = ""
-    if preflight.returncode == 0:
+    if preflight.returncode == 0 and run_cycle:
         cycle = run(["bash", "scripts/aegis_scheduled_run.sh"], cwd=repo)
         cycle_rc = cycle.returncode
         cycle_tail = (cycle.stdout + "\n" + cycle.stderr)[-4000:]
+    elif preflight.returncode == 0:
+        cycle_tail = "observe-only: scheduler cycle not started"
 
     after = read_env(scheduler_dir / "state.env")
     failures = parse_nonnegative_int(after.get("failures"), before_failures)
@@ -237,6 +239,7 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
         "mode": mode,
         "reason": reason,
         "repair_requested": repair,
+        "run_cycle": run_cycle,
         "repairs": repairs,
         "scheduler": {
             "before_failures": before_failures,
@@ -346,8 +349,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--repair", action="store_true", help="Attempt only allowlisted reversible repairs.")
+    parser.add_argument(
+        "--observe-only",
+        action="store_true",
+        help="Measure/evaluate state without starting the scheduler cycle.",
+    )
     args = parser.parse_args()
-    status = execute(Path(args.repo_root), repair=args.repair)
+    status = execute(
+        Path(args.repo_root),
+        repair=args.repair,
+        run_cycle=not args.observe_only,
+    )
     print(json.dumps(status, indent=2, ensure_ascii=False))
     return 0 if status["mode"] == "healthy" else 2
 
