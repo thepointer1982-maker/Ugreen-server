@@ -621,7 +621,9 @@ class FritzBox:
             except Exception as exc:
                 complete = False
                 snap.errors.append(f"usp_controllers:{type(exc).__name__}")
-        snap.remote_scan_complete = complete
+        snap.remote_scan_complete = complete and snap.remote_services_seen > 0
+        if snap.remote_services_seen == 0:
+            snap.errors.append("remote_services:none")
 
     def snapshot(self) -> Snapshot:
         snap = Snapshot()
