@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Safe periodic wrapper around aegis_nas_run_once.sh.
+# Safe periodic wrapper around the complete local AEGIS real cycle.
 # Local-only by default. Set AEGIS_SCHEDULER_PUSH=1 only when GitHub export is
 # explicitly desired. Uses a lock and exponential failure backoff.
 
@@ -104,7 +104,7 @@ fi
 
 log "status=start push=${AEGIS_SCHEDULER_PUSH:-0}"
 set +e
-bash "$REPO_ROOT/scripts/aegis_nas_run_once.sh" "${args[@]}" >>"$LOG_FILE" 2>&1
+python3 "$REPO_ROOT/scripts/aegis_real_cycle.py" "${args[@]}" >>"$LOG_FILE" 2>&1
 rc=$?
 set -e
 
