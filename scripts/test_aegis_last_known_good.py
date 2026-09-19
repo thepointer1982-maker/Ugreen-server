@@ -27,6 +27,8 @@ def main() -> None:
         mod.VERSIONS = mod.ROOT / "versions"
         mod.POINTER = mod.ROOT / "last-known-good.json"
         mod.HISTORY = mod.ROOT / "history.jsonl"
+        mod.PROVISIONAL = mod.ROOT / "provisional.json"
+        mod.PROBATION_HISTORY = mod.ROOT / "probation-history.jsonl"
 
         src = root / "candidate.json"
         src.write_text(
