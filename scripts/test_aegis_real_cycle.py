@@ -70,6 +70,16 @@ payload["_provenance"]={"algorithm":"sha256","kind":"local-ai-miner","sha256":di
 """,
         )
         write(
+            scripts / "aegis_real_status.py",
+            """import json, os, sys
+from pathlib import Path
+out=Path(os.environ.get("AEGIS_REAL_STATUS_FILE", Path.home()/".local/state/aegis-real-status/latest.json"))
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(json.dumps({"health":"healthy"}), encoding="utf-8")
+raise SystemExit(0)
+""",
+        )
+        write(
             scripts / "aegis_guardian_cycle.py",
             """import json, os
 from pathlib import Path
@@ -95,6 +105,7 @@ state.mkdir(parents=True, exist_ok=True)
         assert summary["matrix"]["status"] == "skipped"
         assert summary["miner_provenance"]["verified"] is True
         assert summary["steps"]["guardian"]["rc"] == 0
+        assert summary["steps"]["real_status"]["rc"] == 0
         assert summary["_provenance"]["kind"] == "real-cycle"
 
     print("AEGIS REAL CYCLE TESTS PASS")
