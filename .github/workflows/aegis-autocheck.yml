@@ -93,7 +93,7 @@ jobs:
           from mcp.server import MCPServer
           if not isinstance(mod.mcp, MCPServer):
               raise SystemExit('mcp object is not an MCPServer')
-          for name in ('guardian_status', 'local_ai_inventory', 'learning_cards', 'run_guardian_cycle'):
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'learning_cards', 'run_guardian_cycle'):
               if not callable(getattr(mod, name, None)):
                   raise SystemExit(f'MCP callable missing: {name}')
           print('AEGIS MCP v2 public import contract OK')
