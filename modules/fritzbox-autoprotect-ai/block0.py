@@ -137,6 +137,9 @@ def validate_network_url(url: str, label: str) -> None:
     try:
         ip = ipaddress.ip_address(parsed.hostname)
     except ValueError:
+        host = parsed.hostname.lower()
+        if host not in {"fritz.box", "localhost"} and not host.endsWith(".local"):
+            raise ValueError(f"{label} hostname must be fritz.box, localhost, .local, or a private IP")
         return
     if not _is_private_ip(ip):
         raise ValueError(f"{label} IP must be local/private")
@@ -272,10 +275,7 @@ def secure_atomic_write(path: Path, text: str) -> None:
         os.replace(tmp, path)
         os.chmod(path, 0o600)
     finally:
-        try:
-            os.unlink(tmp)
-        except FileNotFoundError:
-            pass
+        Path(tmp).unlink(missing_ok=True)
 
 
 @contextmanager
