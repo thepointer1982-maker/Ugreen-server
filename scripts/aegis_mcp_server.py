@@ -155,9 +155,15 @@ def last_known_good_status() -> dict:
 
 
 @mcp.tool()
-def restore_last_known_good(destination: str) -> dict:
-    """Restore the verified last-known-good artifact to an explicit local destination."""
-    return restore(Path(destination).expanduser())
+def restore_last_known_good() -> dict:
+    """Restore the verified last-known-good artifact to the operator-configured local target."""
+    raw_target = os.environ.get("AEGIS_LKG_MCP_TARGET")
+    if not raw_target:
+        return {
+            "status": "blocked",
+            "reason": "mcp-rollback-target-not-configured",
+        }
+    return restore(Path(raw_target).expanduser())
 
 
 @mcp.tool()
