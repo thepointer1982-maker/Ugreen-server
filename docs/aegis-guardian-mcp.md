@@ -51,3 +51,21 @@ It exposes:
 - tool `run_guardian_cycle(repair=false)`
 
 The repair tool cannot execute arbitrary shell commands. It delegates only to the hard-coded guardian repair allowlist.
+
+
+## Learning lifecycle
+
+Accepted learning candidates are not activated immediately.
+
+1. The learning gate verifies signed baseline/candidate evidence.
+2. The candidate enters a single exclusive provisional probation state.
+3. Guardian health cycles provide measured pass/fail observations.
+4. Only a confirmed candidate becomes last-known-good.
+5. Activation is atomic and only targets an operator-configured local path.
+6. The previous active artifact is hash-verified and backed up first.
+7. The new active state enters `validating`.
+8. Guardian health cycles promote it to `stable` or roll back to the previous active artifact.
+
+Concurrent provisional candidates and concurrent validating activations are blocked. Re-submitting the same candidate/activation is idempotent.
+
+Repository CI validates the state machine, provenance, LKG, rollback, activation, MCP fail-closed contracts, and regression tests. A green repository state does not by itself prove deployment on the physical NAS or worker nodes.
