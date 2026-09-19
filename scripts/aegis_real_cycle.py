@@ -280,8 +280,12 @@ def main() -> int:
     if status_step["rc"] not in (0, 2):
         result["status"] = "blocked"
         result["reason"] = "real-status-generation-failed"
-        result = attach_provenance(result, kind="real-cycle")
-        atomic_json(summary_file, result)
+
+    result = attach_provenance(
+        {k: v for k, v in result.items() if k != "_provenance"},
+        kind="real-cycle",
+    )
+    atomic_json(summary_file, result)
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result["status"] == "healthy" else (guardian["rc"] or status_step["rc"] or 24)
