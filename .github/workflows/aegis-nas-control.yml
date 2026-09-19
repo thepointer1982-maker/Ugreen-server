@@ -1,0 +1,100 @@
+name: AEGIS NAS Control
+
+on:
+  push:
+    branches:
+      - aegis-control
+    paths:
+      - '.aegis-control/request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aegis-nas-control
+  cancel-in-progress: false
+
+jobs:
+  nas-control:
+    if: github.actor == 'thepointer1982-maker'
+    runs-on: [self-hosted, linux, x64, aegis-ugreen]
+    timeout-minutes: 30
+
+    steps:
+      - name: Read control request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST="$GITHUB_WORKSPACE/.aegis-control/request.json"
+          mkdir -p "$GITHUB_WORKSPACE/.aegis-control"
+          git -C "$GITHUB_WORKSPACE" init >/dev/null 2>&1 || true
+          git -C "$GITHUB_WORKSPACE" remote remove origin >/dev/null 2>&1 || true
+          git -C "$GITHUB_WORKSPACE" remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "$GITHUB_REF_NAME"
+          git -C "$GITHUB_WORKSPACE" checkout --force FETCH_HEAD -- .aegis-control/request.json
+          python3 - "$REQUEST" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          p = Path(sys.argv[1])
+          d = json.loads(p.read_text(encoding="utf-8"))
+          action = d.get("action")
+          allowed = {"status", "real-cycle", "deploy-retry"}
+          if action not in allowed:
+              raise SystemExit(f"blocked action: {action}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"action={action}\n")
+          PY
+
+      - name: Validate local AEGIS repository
+        shell: bash
+        env:
+          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
+        run: |
+          set -euo pipefail
+          test -d "$AEGIS_REPO_PATH/.git"
+          test -f "$AEGIS_REPO_PATH/scripts/aegis_real_status.py"
+          test -f "$AEGIS_REPO_PATH/scripts/aegis_real_cycle.py"
+          test -f "$AEGIS_REPO_PATH/scripts/aegis_remote_apply_retry.sh"
+
+      - name: Status only
+        if: steps.request.outputs.action == 'status'
+        shell: bash
+        env:
+          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
+        run: |
+          set -euo pipefail
+          cd "$AEGIS_REPO_PATH"
+          python3 scripts/aegis_real_status.py --repo-root "$AEGIS_REPO_PATH"
+
+      - name: Real cycle
+        if: steps.request.outputs.action == 'real-cycle'
+        shell: bash
+        env:
+          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
+        run: |
+          set -euo pipefail
+          cd "$AEGIS_REPO_PATH"
+          python3 scripts/aegis_real_cycle.py --repo-root "$AEGIS_REPO_PATH"
+
+      - name: Deploy retry
+        if: steps.request.outputs.action == 'deploy-retry'
+        shell: bash
+        env:
+          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
+        run: |
+          set -euo pipefail
+          cd "$AEGIS_REPO_PATH"
+          bash scripts/aegis_remote_apply_retry.sh --repo-root "$AEGIS_REPO_PATH" --repair
+
+      - name: Print signed real status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="${AEGIS_REAL_STATUS_FILE:-$HOME/.local/state/aegis-real-status/latest.json}"
+          if [[ -s "$STATUS" ]]; then
+            cat "$STATUS"
+          else
+            echo '{"health":"unknown","blockers":["real-status-missing"]}'
+          fi
