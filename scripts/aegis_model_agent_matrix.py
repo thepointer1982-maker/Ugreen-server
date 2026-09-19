@@ -17,7 +17,13 @@ def open_ro(path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True, timeout=3)
 
 def has_table(conn: sqlite3.Connection, name: str) -> bool:
-    return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (name,),
+    ).fetchone() is not None
+
+def columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f'PRAGMA table_info("{table}")')}
 
 def trace_rows(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
@@ -50,9 +56,18 @@ def telemetry_rows(path: Path) -> list[dict[str, Any]]:
     try:
         if not has_table(conn, "telemetry"):
             return []
+        cols = columns(conn, "telemetry")
+        required = {
+            "agent", "model_id", "latency_seconds", "throughput_tok_per_sec",
+            "total_tokens", "cost_usd", "energy_joules",
+        }
+        missing = required - cols
+        if missing:
+            return []
+        where = " WHERE is_warmup=0" if "is_warmup" in cols else ""
         rows = conn.execute(
             "SELECT agent, model_id, latency_seconds, throughput_tok_per_sec, total_tokens, cost_usd, energy_joules "
-            "FROM telemetry WHERE is_warmup=0"
+            "FROM telemetry" + where
         ).fetchall()
         return [
             {
