@@ -39,6 +39,17 @@ def main():
         legacy_rows=mod.telemetry_rows(legacy)
         assert len(legacy_rows)==1
         assert legacy_rows[0]["model"]=="legacy"
+
+        telemetry_only = [
+            {"agent":"coder","model":"fast","latency":0.2,"throughput":50.0,"tokens":10,"cost":0.0,"energy":0.1}
+            for _ in range(50)
+        ]
+        guarded = mod.build_matrix([], telemetry_only, 3)
+        fast = next(r for r in guarded["rows"] if r["model"]=="fast")
+        assert fast["telemetry_count"] == 50
+        assert fast["trace_count"] == 0
+        assert fast["eligible_for_routing"] is False
+        assert "coder" not in guarded["best_by_agent"]
     print("AEGIS MODEL AGENT MATRIX TESTS PASS")
 
 if __name__=="__main__": main()
