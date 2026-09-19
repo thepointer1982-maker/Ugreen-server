@@ -112,6 +112,35 @@ def main() -> None:
         )
         assert rejected["status"] == "rejected"
         assert rejected["rollback"]["status"] == "not-needed"
+        assert mod.provisional_status()["status"] == "missing-or-invalid"
+
+        candidate_after_reject = root / "candidate-after-reject.json"
+        candidate_after_reject.write_text(
+            json.dumps(attach_provenance({"score": 0.965}, kind="eval-candidate")),
+            encoding="utf-8",
+        )
+        restaged = mod.stage_provisional(
+            candidate_after_reject,
+            kind="model-routing",
+            required_passes=1,
+            max_failures=0,
+        )
+        assert restaged["status"] == "provisional"
+        assert mod.observe_provisional(passed=True)["status"] == "confirmed"
+
+        first_fail_target = allowed_root / "first-fail.json"
+        first_fail_activation = mod.activate_current_lkg(
+            first_fail_target,
+            required_health_passes=2,
+        )
+        assert first_fail_activation["status"] == "activated-validating"
+        first_fail_health = mod.observe_active_health(
+            passed=False,
+            evidence={"run": "first-activation-regression"},
+        )
+        assert first_fail_health["status"] == "regression"
+        assert first_fail_health["rollback"]["status"] == "rolled-back-empty"
+        assert not first_fail_target.exists()
 
         active_target = allowed_root / "routing.json"
         first_active = mod.activate_current_lkg(active_target, required_health_passes=2)
