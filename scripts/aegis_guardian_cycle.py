@@ -15,6 +15,10 @@ STATE_DIR = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", Path.home() / ".loca
 STATUS_FILE = STATE_DIR / "status.json"
 CARDS_FILE = STATE_DIR / "learning-cards.jsonl"
 INDEX_FILE = STATE_DIR / "learning-index.json"
+AI_MINER_REPORT = Path(os.environ.get(
+    "AEGIS_AI_MINER_REPORT",
+    Path.home() / ".local/state/aegis-ai-miner/latest.json",
+))
 
 SAFE_SERVICE = "aegis-export.service"
 STALE_LOCK_SECONDS = 7200
@@ -184,6 +188,9 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
 
     latest = read_json(repo / "scores/latest.json")
     autocheck = read_json(repo / "dashboard/autocheck.json")
+    ai_report = read_json(AI_MINER_REPORT)
+    ai_findings = ai_report.get("findings", []) if isinstance(ai_report.get("findings"), list) else []
+    ai_codes = [f.get("code") for f in ai_findings if isinstance(f, dict) and f.get("code")]
     status = {
         "schema": "aegis-guardian-status/v1",
         "generated_at": now_iso(),
@@ -209,6 +216,10 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
             "evidence_verified": autocheck.get("evidence_verified"),
             "deepdiag_score": autocheck.get("deepdiag_score"),
             "priority_findings": len(autocheck.get("priority_findings", [])) if isinstance(autocheck.get("priority_findings"), list) else None,
+            "local_ai_findings": ai_codes,
+            "ollama_reachable": ai_report.get("ollama", {}).get("reachable") if isinstance(ai_report.get("ollama"), dict) else None,
+            "ollama_model_count": len(ai_report.get("ollama", {}).get("models", [])) if isinstance(ai_report.get("ollama"), dict) and isinstance(ai_report.get("ollama", {}).get("models"), list) else None,
+            "local_ai_db_count": len(ai_report.get("inventory", {}).get("sqlite_databases", [])) if isinstance(ai_report.get("inventory"), dict) and isinstance(ai_report.get("inventory", {}).get("sqlite_databases"), list) else None,
         },
         "guardrails": {
             "partition_changes": False,
