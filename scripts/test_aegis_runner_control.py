@@ -16,7 +16,7 @@ def main():
     assert "AEGIS_RUNNER_TOKEN missing" in p.stderr
 
     w = WORKFLOW.read_text(encoding="utf-8")
-    assert "runs-on: [self-hosted, linux, x64, aegis-ugreen]" in w
+    assert "runs-on: [self-hosted, linux, aegis-ugreen]" in w
     assert "github.actor == 'thepointer1982-maker'" in w
     assert "pull_request:" not in w
     assert "deploy-retry" in w and "real-cycle" in w and "status" in w
