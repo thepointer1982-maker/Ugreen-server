@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from hashlib import sha256
-from pathlib import Path
-from typing import Any, Iterator
-from urllib.parse import urljoin, urlparse
-from xml.sax.saxutils import escape, quoteattr
 import argparse
 import hmac
 import ipaddress
@@ -18,6 +10,15 @@ import socket
 import tempfile
 import time
 import tomllib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha256
+from pathlib import Path
+from typing import Any
+from urllib.parse import urljoin, urlparse
+from xml.sax.saxutils import escape, quoteattr
 
 import requests
 from defusedxml import ElementTree as SafeET
@@ -63,7 +64,7 @@ class Config:
     audit_key_file: str = "/etc/aegis/autoprotect-audit.key"
     fritz_url: str = "http://fritz.box:49000"
     fritz_user: str = ""
-    password_env: str = "AEGIS_FRITZ_PASSWORD"
+    password_env: str = "AEGIS_FRITZ_PASSWORD"  # noqa: S105
     timeout: int = 8
     verify_tls: bool = False
     allow_insecure_tls: bool = False
@@ -139,7 +140,7 @@ def validate_network_url(url: str, label: str) -> None:
     except ValueError:
         host = parsed.hostname.lower()
         if host not in {"fritz.box", "localhost"} and not host.endswith(".local"):
-            raise ValueError(f"{label} hostname must be fritz.box, localhost, .local, or a private IP")
+            raise ValueError(f"{label} hostname must be fritz.box, localhost, .local, or a private IP") from None
         return
     if not _is_private_ip(ip):
         raise ValueError(f"{label} IP must be local/private")
@@ -211,7 +212,7 @@ class Service:
 
 @dataclass(slots=True)
 class Snapshot:
-    captured_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    captured_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     reachable: bool = False
     services: list[dict[str, Any]] = field(default_factory=list)
     device_info: dict[str, Any] = field(default_factory=dict)
@@ -905,7 +906,7 @@ class Engine:
     def _recent_stable_scores(self) -> list[float]:
         if not self.audit.verify():
             return []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scores: list[float] = []
         for record in reversed(self.audit.records()):
             if record.get("config_fingerprint") != self.fingerprint:
@@ -914,7 +915,7 @@ class Engine:
             try:
                 captured = datetime.fromisoformat(str(timestamp))
                 if captured.tzinfo is None:
-                    captured = captured.replace(tzinfo=timezone.utc)
+                    captured = captured.replace(tzinfo=UTC)
             except Exception:
                 break
             if (now - captured).total_seconds() > self.cfg.stable_max_age_seconds:
