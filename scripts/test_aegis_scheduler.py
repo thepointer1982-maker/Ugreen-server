@@ -122,6 +122,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertIn("User=aegis-test", result.stdout)
         self.assertIn("OnUnitActiveSec=15min", result.stdout)
         self.assertIn("Environment=AEGIS_REAL_CYCLE_STATE_DIR=", result.stdout)
+        self.assertIn("Environment=AEGIS_REAL_STATUS_FILE=", result.stdout)
         self.assertIn("Environment=AEGIS_AI_MINER_STATE_DIR=", result.stdout)
         self.assertIn("Environment=AEGIS_GUARDIAN_STATE_DIR=", result.stdout)
         self.assertIn("Environment=AEGIS_LKG_STATE_DIR=", result.stdout)
@@ -135,6 +136,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertNotIn("\nUser=", result.stdout)
         self.assertIn("Environment=AEGIS_STATE_DIR=", result.stdout)
         self.assertIn("aegis-real-cycle", result.stdout)
+        self.assertIn("aegis-real-status", result.stdout)
 
     def test_installer_push_requires_explicit_flag(self):
         result = self.run_installer("--mode", "system", "--run-user", "aegis-test", "--push", "--dry-run")
