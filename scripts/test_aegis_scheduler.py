@@ -65,6 +65,46 @@ class SchedulerTests(unittest.TestCase):
             self.assertIn("failures=0", text)
             self.assertIn("next_allowed=0", text)
 
+    def test_live_lock_owner_is_not_recovered(self):
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw)
+            repo = self.make_repo(td, 0)
+            state, counter = td / "state", td / "counter"
+            lock = state / "run.lock"
+            lock.mkdir(parents=True)
+            boot_id = (
+                Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+                if Path("/proc/sys/kernel/random/boot_id").exists()
+                else "unknown"
+            )
+            (lock / "owner").write_text(
+                f"pid={os.getpid()}\nboot_id={boot_id}\n",
+                encoding="utf-8",
+            )
+            result = self.run_wrapper(repo, state, counter)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("reason=lock_busy", result.stdout)
+            self.assertFalse(counter.exists())
+
+    def test_old_dead_lock_is_recovered(self):
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw)
+            repo = self.make_repo(td, 0)
+            state, counter = td / "state", td / "counter"
+            lock = state / "run.lock"
+            lock.mkdir(parents=True)
+            (lock / "owner").write_text(
+                "pid=999999\nboot_id=stale-boot\n",
+                encoding="utf-8",
+            )
+            old = 1
+            os.utime(lock, (old, old))
+            result = self.run_wrapper(repo, state, counter)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("reason=stale_lock_recovered", result.stdout)
+            self.assertTrue(counter.exists())
+            self.assertEqual(counter.read_text().count("fake-run"), 1)
+
     def test_installer_system_dry_run_defaults_to_local_only(self):
         result = self.run_installer("--mode", "system", "--run-user", "aegis-test", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
