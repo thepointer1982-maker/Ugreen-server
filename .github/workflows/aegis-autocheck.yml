@@ -14,6 +14,8 @@ on:
       - 'scripts/aegis_guardian_cycle.py'
       - 'scripts/test_aegis_real_cycle.py'
       - 'scripts/aegis_real_cycle.py'
+      - 'scripts/test_aegis_real_status.py'
+      - 'scripts/aegis_real_status.py'
       - 'scripts/aegis_mcp_server.py'
       - 'scripts/aegis_local_ai_miner.py'
       - 'scripts/test_aegis_pipeline.py'
@@ -81,6 +83,9 @@ jobs:
       - name: Run AEGIS real-cycle regression tests
         run: python3 scripts/test_aegis_real_cycle.py
 
+      - name: Run AEGIS real-status regression tests
+        run: python3 scripts/test_aegis_real_status.py
+
       - name: Validate hardened shell syntax
         run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
 
@@ -102,8 +107,8 @@ jobs:
       - name: Run AEGIS learning gate regression tests
         run: python3 scripts/test_aegis_learning_gate.py
 
-      - name: Compile guardian, real-cycle, provenance, LKG, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_real_cycle.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+      - name: Compile guardian, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
