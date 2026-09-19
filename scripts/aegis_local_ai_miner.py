@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from aegis_provenance import attach_provenance
+
 STATE_DIR = Path(os.environ.get("AEGIS_AI_MINER_STATE_DIR", Path.home() / ".local/state/aegis-ai-miner"))
 REPORT = STATE_DIR / "latest.json"
 HISTORY = STATE_DIR / "history.jsonl"
@@ -346,7 +348,7 @@ def main() -> int:
     findings = derive_findings(dbs, ollama, guardian)
 
     report = {
-        "schema": "aegis-local-ai-miner/v1",
+        "schema": "aegis-local-ai-miner/v2",
         "generated_at": now_iso(),
         "mode": "read-only-local-evidence",
         "roots": [{"path": str(p), "exists": p.exists()} for p in roots],
@@ -367,6 +369,7 @@ def main() -> int:
         },
     }
 
+    report = attach_provenance(report, kind="local-ai-miner")
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = REPORT.with_suffix(".tmp")
     tmp.write_text(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
@@ -378,6 +381,7 @@ def main() -> int:
             "ollama_reachable": ollama["reachable"],
             "ollama_models": len(ollama["models"]),
             "findings": [f["code"] for f in findings],
+            "sha256": report["_provenance"]["sha256"],
         }, sort_keys=True) + "\n")
 
     print(json.dumps(report, indent=2, ensure_ascii=False))
