@@ -18,6 +18,10 @@ on:
       - 'scripts/test_aegis_scheduler.py'
       - 'scripts/test_aegis_guardian.py'
       - 'scripts/test_aegis_local_ai_miner.py'
+      - 'scripts/aegis_model_agent_matrix.py'
+      - 'scripts/test_aegis_model_agent_matrix.py'
+      - 'scripts/aegis_learning_gate.py'
+      - 'scripts/test_aegis_learning_gate.py'
       - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   pull_request:
@@ -66,8 +70,14 @@ jobs:
       - name: Run AEGIS local AI miner regression tests
         run: python3 scripts/test_aegis_local_ai_miner.py
 
-      - name: Compile guardian, miner and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_local_ai_miner.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_local_ai_miner.py
+      - name: Run AEGIS model-agent matrix regression tests
+        run: python3 scripts/test_aegis_model_agent_matrix.py
+
+      - name: Run AEGIS learning gate regression tests
+        run: python3 scripts/test_aegis_learning_gate.py
+
+      - name: Compile guardian, miner, matrix, gate and MCP modules
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
