@@ -70,6 +70,12 @@ required_scripts=(
   scripts/aegis_export_collect.sh
   scripts/aegis_repo_autocheck.py
   scripts/aegis_nas_run_once.sh
+  scripts/aegis_real_cycle.py
+  scripts/aegis_local_ai_miner.py
+  scripts/aegis_model_agent_matrix.py
+  scripts/aegis_guardian_cycle.py
+  scripts/aegis_provenance.py
+  scripts/aegis_last_known_good.py
 )
 missing_scripts=()
 for p in "${required_scripts[@]}"; do
