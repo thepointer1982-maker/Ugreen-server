@@ -11,45 +11,91 @@ permissions:
   contents: read
 
 concurrency:
-  group: aegis-nas-control
+  group: aegis-nas-control-v2
   cancel-in-progress: false
 
 jobs:
   nas-control:
     if: github.actor == 'thepointer1982-maker'
-    runs-on: [self-hosted, linux, aegis-ugreen]
+    runs-on: [self-hosted, linux, aegis-ugreen-v2]
     timeout-minutes: 30
 
     steps:
-      - name: Read control request
+      - name: Read and validate control request
         id: request
         shell: bash
         run: |
           set -euo pipefail
           REQUEST="$GITHUB_WORKSPACE/.aegis-control/request.json"
-          mkdir -p "$GITHUB_WORKSPACE/.aegis-control"
+
           git -C "$GITHUB_WORKSPACE" init >/dev/null 2>&1 || true
           git -C "$GITHUB_WORKSPACE" remote remove origin >/dev/null 2>&1 || true
           git -C "$GITHUB_WORKSPACE" remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
           git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "$GITHUB_REF_NAME"
           git -C "$GITHUB_WORKSPACE" checkout --force FETCH_HEAD -- .aegis-control/request.json
+
           python3 - "$REQUEST" <<'PY'
-          import json, os, sys
+          import json, os, re, sys
           from pathlib import Path
+
           p = Path(sys.argv[1])
           d = json.loads(p.read_text(encoding="utf-8"))
           action = d.get("action")
+          trusted_sha = d.get("trusted_sha")
+          sequence = d.get("sequence")
+
           allowed = {"status", "real-cycle", "deploy-retry"}
           if action not in allowed:
               raise SystemExit(f"blocked action: {action}")
+          if not isinstance(trusted_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", trusted_sha):
+              raise SystemExit("blocked: trusted_sha must be a full 40-char lowercase commit SHA")
+          if not isinstance(sequence, int) or sequence < 1:
+              raise SystemExit("blocked: sequence must be a positive integer")
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"action={action}\n")
+              f.write(f"trusted_sha={trusted_sha}\n")
+              f.write(f"sequence={sequence}\n")
           PY
 
-      - name: Validate local AEGIS repository
+      - name: Prepare trusted runtime checkout
         shell: bash
         env:
-          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
+          TRUSTED_SHA: ${{ steps.request.outputs.trusted_sha }}
+        run: |
+          set -euo pipefail
+
+          RUNTIME_ROOT="${AEGIS_RUNTIME_ROOT:-$HOME/aegis-runtime}"
+          REPO="$RUNTIME_ROOT/Ugreen-server"
+          mkdir -p "$RUNTIME_ROOT"
+          chmod 700 "$RUNTIME_ROOT"
+
+          if [[ ! -d "$REPO/.git" ]]; then
+            git clone --no-checkout "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$REPO"
+          fi
+
+          git -C "$REPO" remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -C "$REPO" fetch --prune origin aegis/guardian-learning-mcp
+          git -C "$REPO" cat-file -e "$TRUSTED_SHA^{commit}"
+
+          if ! git -C "$REPO" merge-base --is-ancestor "$TRUSTED_SHA" FETCH_HEAD; then
+            echo "blocked: trusted_sha is not an ancestor of origin/aegis/guardian-learning-mcp" >&2
+            exit 20
+          fi
+
+          git -C "$REPO" checkout --detach --force "$TRUSTED_SHA"
+          git -C "$REPO" reset --hard "$TRUSTED_SHA"
+          git -C "$REPO" clean -fdx
+
+          [[ -z "$(git -C "$REPO" status --porcelain)" ]] || {
+            echo "blocked: runtime checkout is not clean" >&2
+            exit 21
+          }
+
+          echo "AEGIS_REPO_PATH=$REPO" >> "$GITHUB_ENV"
+
+      - name: Validate trusted AEGIS runtime
+        shell: bash
         run: |
           set -euo pipefail
           test -d "$AEGIS_REPO_PATH/.git"
@@ -60,8 +106,6 @@ jobs:
       - name: Status only
         if: steps.request.outputs.action == 'status'
         shell: bash
-        env:
-          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
         run: |
           set -euo pipefail
           cd "$AEGIS_REPO_PATH"
@@ -70,8 +114,6 @@ jobs:
       - name: Real cycle
         if: steps.request.outputs.action == 'real-cycle'
         shell: bash
-        env:
-          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
         run: |
           set -euo pipefail
           cd "$AEGIS_REPO_PATH"
@@ -80,8 +122,6 @@ jobs:
       - name: Deploy retry
         if: steps.request.outputs.action == 'deploy-retry'
         shell: bash
-        env:
-          AEGIS_REPO_PATH: /opt/aegis/Ugreen-server
         run: |
           set -euo pipefail
           cd "$AEGIS_REPO_PATH"
