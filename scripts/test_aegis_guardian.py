@@ -20,6 +20,9 @@ def main() -> None:
     assert mod.classify(3, 0, 7) == ("degraded", "persistent-failures")
     assert mod.classify(5, 0, 7) == ("emergency", "repeated-failures")
     assert mod.classify(0, 20, None) == ("blocked", "preflight-blocked")
+    assert mod.parse_nonnegative_int("4", 0) == 4
+    assert mod.parse_nonnegative_int("broken", 7) == 7
+    assert mod.parse_nonnegative_int("-2", 3) == 3
 
     with tempfile.TemporaryDirectory() as raw:
         state = Path(raw)
@@ -33,6 +36,12 @@ def main() -> None:
         rows = [json.loads(x) for x in mod.CARDS_FILE.read_text().splitlines()]
         assert len(rows) == 2
         assert rows[-1]["fingerprint"] == rows[0]["fingerprint"]
+
+    with tempfile.TemporaryDirectory() as raw:
+        cwd = Path(raw)
+        cp = mod.run(["python3", "-c", "import time; time.sleep(2)"], cwd=cwd, timeout=1)
+        assert cp.returncode == 124
+        assert "timeout" in cp.stderr.lower()
 
     print("AEGIS GUARDIAN TESTS PASS")
 
