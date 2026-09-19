@@ -1,7 +1,8 @@
 {
-  "schema": "aegis-control/v1",
+  "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 2,
+  "sequence": 3,
+  "trusted_sha": "7a884222b45cc65494e5a48612ab9cae87bb656e",
   "requested_by": "repository-owner",
-  "purpose": "verify-live-nas-control-channel"
+  "purpose": "verify-v2-live-nas-control-channel"
 }
