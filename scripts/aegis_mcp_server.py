@@ -14,7 +14,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
 from aegis_local_ai_miner import REPORT as AI_REPORT
-from aegis_last_known_good import current, provisional_status, observe_provisional, restore
+from aegis_last_known_good import active_status, activate_current_lkg, current, provisional_status, observe_provisional, restore
 
 REPO_ROOT = Path(
     os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])
@@ -146,6 +146,24 @@ def model_agent_matrix() -> dict:
 def learning_gate_status() -> dict:
     """Return the latest fail-closed learning acceptance decision."""
     return _read_json(LEARNING_GATE_FILE, "not-yet-evaluated")
+
+
+@mcp.tool()
+def active_state_status() -> dict:
+    """Return the verified active-state validation status."""
+    return active_status()
+
+
+@mcp.tool()
+def activate_last_known_good() -> dict:
+    """Activate the verified LKG at the operator-configured local target."""
+    raw_target = os.environ.get("AEGIS_LKG_ACTIVATION_TARGET")
+    if not raw_target:
+        return {
+            "status": "blocked",
+            "reason": "activation-target-not-configured",
+        }
+    return activate_current_lkg(Path(raw_target).expanduser())
 
 
 @mcp.tool()
