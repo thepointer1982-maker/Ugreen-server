@@ -89,6 +89,7 @@ TIMER_CONTENT=""
 
 if [[ "$MODE" == user ]]; then
   BASE_STATE="${XDG_STATE_HOME:-$HOME/.local/state}"
+  BOOTSTRAP_STATE_DIR="$BASE_STATE/aegis-bootstrap"
   STATE_DIR="$BASE_STATE/aegis-scheduler"
   REAL_CYCLE_STATE_DIR="$BASE_STATE/aegis-real-cycle"
   AI_MINER_STATE_DIR="$BASE_STATE/aegis-ai-miner"
@@ -103,6 +104,7 @@ Type=oneshot
 WorkingDirectory=$REPO_ROOT
 Environment=AEGIS_REPO_ROOT=$REPO_ROOT
 Environment=AEGIS_SCHEDULER_PUSH=$ENABLE_PUSH
+Environment=AEGIS_STATE_DIR=$BOOTSTRAP_STATE_DIR
 Environment=AEGIS_SCHEDULER_STATE_DIR=$STATE_DIR
 Environment=AEGIS_REAL_CYCLE_STATE_DIR=$REAL_CYCLE_STATE_DIR
 Environment=AEGIS_AI_MINER_STATE_DIR=$AI_MINER_STATE_DIR
@@ -116,17 +118,22 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=$REPO_ROOT $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
+ReadWritePaths=$REPO_ROOT $BOOTSTRAP_STATE_DIR $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
 EOF
 )
 else
   RUN_GROUP="$(id -gn "$RUN_USER" 2>/dev/null || printf '%s' "$RUN_USER")"
-  RUN_HOME="$(python3 - "$RUN_USER" <<'PY'
+  if [[ "$DRY_RUN" -eq 1 ]] && ! id "$RUN_USER" >/dev/null 2>&1; then
+    RUN_HOME="/home/$RUN_USER"
+  else
+    RUN_HOME="$(python3 - "$RUN_USER" <<'PY'
 import pwd, sys
 print(pwd.getpwnam(sys.argv[1]).pw_dir)
 PY
 )"
+  fi
   BASE_STATE="$RUN_HOME/.local/state"
+  BOOTSTRAP_STATE_DIR="$BASE_STATE/aegis-bootstrap"
   STATE_DIR="$BASE_STATE/aegis-scheduler"
   REAL_CYCLE_STATE_DIR="$BASE_STATE/aegis-real-cycle"
   AI_MINER_STATE_DIR="$BASE_STATE/aegis-ai-miner"
@@ -144,6 +151,7 @@ Group=$RUN_GROUP
 WorkingDirectory=$REPO_ROOT
 Environment=AEGIS_REPO_ROOT=$REPO_ROOT
 Environment=AEGIS_SCHEDULER_PUSH=$ENABLE_PUSH
+Environment=AEGIS_STATE_DIR=$BOOTSTRAP_STATE_DIR
 Environment=AEGIS_SCHEDULER_STATE_DIR=$STATE_DIR
 Environment=AEGIS_REAL_CYCLE_STATE_DIR=$REAL_CYCLE_STATE_DIR
 Environment=AEGIS_AI_MINER_STATE_DIR=$AI_MINER_STATE_DIR
@@ -157,7 +165,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=false
-ReadWritePaths=$REPO_ROOT $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
+ReadWritePaths=$REPO_ROOT $BOOTSTRAP_STATE_DIR $STATE_DIR $REAL_CYCLE_STATE_DIR $AI_MINER_STATE_DIR $GUARDIAN_STATE_DIR $LKG_STATE_DIR
 LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
@@ -193,7 +201,7 @@ fi
 
 if [[ "$MODE" == user ]]; then
   UNIT_DIR="$HOME/.config/systemd/user"
-  mkdir -p "$UNIT_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
+  mkdir -p "$UNIT_DIR" "$BOOTSTRAP_STATE_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
   printf '%s\n' "$SERVICE_CONTENT" > "$UNIT_DIR/aegis-export.service"
   printf '%s\n' "$TIMER_CONTENT" > "$UNIT_DIR/aegis-export.timer"
   systemctl --user daemon-reload
@@ -213,11 +221,11 @@ else
   PRIV=(sudo)
 fi
 
-mkdir -p "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
+mkdir -p "$BOOTSTRAP_STATE_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 if [[ "$(id -u)" -eq 0 ]]; then
-  chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
+  chown -R "$RUN_USER:$RUN_GROUP" "$BOOTSTRAP_STATE_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 else
-  "${PRIV[@]}" chown -R "$RUN_USER:$RUN_GROUP" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
+  "${PRIV[@]}" chown -R "$RUN_USER:$RUN_GROUP" "$BOOTSTRAP_STATE_DIR" "$STATE_DIR" "$REAL_CYCLE_STATE_DIR" "$AI_MINER_STATE_DIR" "$GUARDIAN_STATE_DIR" "$LKG_STATE_DIR"
 fi
 printf '%s\n' "$SERVICE_CONTENT" | "${PRIV[@]}" tee /etc/systemd/system/aegis-export.service >/dev/null
 printf '%s\n' "$TIMER_CONTENT" | "${PRIV[@]}" tee /etc/systemd/system/aegis-export.timer >/dev/null
