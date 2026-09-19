@@ -29,6 +29,10 @@ def main() -> None:
         mod.HISTORY = mod.ROOT / "history.jsonl"
         mod.PROVISIONAL = mod.ROOT / "provisional.json"
         mod.PROBATION_HISTORY = mod.ROOT / "probation-history.jsonl"
+        mod.ACTIVE = mod.ROOT / "active.json"
+        mod.PREVIOUS_ACTIVE = mod.ROOT / "previous-active.json"
+        mod.ACTIVE_HISTORY = mod.ROOT / "active-history.jsonl"
+        mod.ACTIVE_BACKUPS = mod.ROOT / "active-backups"
 
         src = root / "candidate.json"
         src.write_text(
@@ -88,6 +92,32 @@ def main() -> None:
         )
         assert rejected["status"] == "rejected"
         assert rejected["rollback"]["status"] in {"restored", "already-current"}
+
+        active_target = allowed_root / "routing.json"
+        first_active = mod.activate_current_lkg(active_target, required_health_passes=2)
+        assert first_active["status"] == "activated-validating"
+        h1 = mod.observe_active_health(passed=True, evidence={"run": 1})
+        assert h1["status"] == "validating"
+        h2 = mod.observe_active_health(passed=True, evidence={"run": 2})
+        assert h2["status"] == "stable"
+
+        candidate4 = root / "candidate4.json"
+        candidate4.write_text(
+            json.dumps(attach_provenance({"score": 0.99}, kind="eval-candidate")),
+            encoding="utf-8",
+        )
+        promoted4 = mod.promote(candidate4, kind="model-routing")
+        assert promoted4["status"] == "promoted"
+        second_active = mod.activate_current_lkg(active_target, required_health_passes=2)
+        assert second_active["status"] == "activated-validating"
+        bad_health = mod.observe_active_health(
+            passed=False,
+            evidence={"run": "activation-regression"},
+        )
+        assert bad_health["status"] == "regression"
+        assert bad_health["rollback"]["status"] == "rolled-back"
+        rolled_value = json.loads(active_target.read_text())
+        assert rolled_value["_provenance"]["sha256"] == new_digest
 
         outside = root / "outside" / "active.json"
         blocked_restore = mod.restore(outside)
