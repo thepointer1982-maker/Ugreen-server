@@ -24,6 +24,11 @@ ROOT = Path(os.environ.get(
 VERSIONS = ROOT / "versions"
 POINTER = ROOT / "last-known-good.json"
 HISTORY = ROOT / "history.jsonl"
+DEFAULT_RESTORE_ROOTS = [
+    Path.home() / ".local/state/aegis-ai-miner",
+    Path.home() / ".local/state/aegis-guardian",
+    Path("/opt/aegis"),
+]
 
 
 def now_iso() -> str:
@@ -132,7 +137,36 @@ def current() -> dict[str, Any]:
     return {"status": "ok", "pointer": value, "artifact": artifact_value}
 
 
+def _allowed_restore_roots() -> list[Path]:
+    raw = os.environ.get("AEGIS_LKG_RESTORE_ROOTS")
+    roots = [Path(p).expanduser() for p in raw.split(os.pathsep)] if raw else DEFAULT_RESTORE_ROOTS
+    resolved: list[Path] = []
+    for root in roots:
+        try:
+            resolved.append(root.resolve(strict=False))
+        except OSError:
+            continue
+    return resolved
+
+
+def _destination_allowed(destination: Path) -> bool:
+    try:
+        resolved = destination.expanduser().resolve(strict=False)
+    except OSError:
+        return False
+    for root in _allowed_restore_roots():
+        if resolved == root or root in resolved.parents:
+            return True
+    return False
+
+
 def restore(destination: Path) -> dict[str, Any]:
+    if not _destination_allowed(destination):
+        return {
+            "status": "blocked",
+            "reason": "destination-outside-allowlist",
+            "destination": str(destination),
+        }
     cur = current()
     if cur.get("status") != "ok":
         return {"status": "blocked", "reason": cur.get("reason", "no-valid-lkg")}
