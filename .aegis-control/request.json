@@ -1,6 +1,7 @@
 {
   "schema": "aegis-control/v1",
   "action": "status",
+  "sequence": 2,
   "requested_by": "repository-owner",
-  "purpose": "first-safe-nas-control-channel-check"
+  "purpose": "verify-live-nas-control-channel"
 }
