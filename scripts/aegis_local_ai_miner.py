@@ -162,22 +162,26 @@ def scan_roots(roots: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, 
             exists = False
         if not exists:
             continue
-        for path in root.rglob("*"):
-            if seen >= MAX_SCAN_FILES:
-                break
-            try:
-                if not path.is_file() or path.is_symlink():
+        try:
+            iterator = root.rglob("*")
+            for path in iterator:
+                if seen >= MAX_SCAN_FILES:
+                    break
+                try:
+                    if not path.is_file() or path.is_symlink():
+                        continue
+                except OSError:
                     continue
-            except OSError:
-                continue
-            seen += 1
-            suffix = path.suffix.lower()
-            suffix_counts[suffix or "(none)"] += 1
-            if suffix in DB_SUFFIXES:
-                dbs.append(sqlite_summary(path))
-            elif suffix in TEXT_SUFFIXES:
-                meta = {"path": str(path), "suffix": suffix, **safe_stat(path)}
-                files.append(meta)
+                seen += 1
+                suffix = path.suffix.lower()
+                suffix_counts[suffix or "(none)"] += 1
+                if suffix in DB_SUFFIXES:
+                    dbs.append(sqlite_summary(path))
+                elif suffix in TEXT_SUFFIXES:
+                    meta = {"path": str(path), "suffix": suffix, **safe_stat(path)}
+                    files.append(meta)
+        except (OSError, PermissionError):
+            continue
         if seen >= MAX_SCAN_FILES:
             break
     return files, dbs, dict(suffix_counts)
