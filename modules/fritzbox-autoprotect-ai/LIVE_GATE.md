@@ -1,39 +1,47 @@
-# Block-0 live gate
+# Block-0 local live gate
 
-The code gate is not the network gate. Block 1 must remain locked until a real LAN-side run reaches the Block-0 threshold.
+The code gate and the network gate are separate.
 
-## Privacy rule
+GitHub CI may test source code, but it must not be a remote execution channel into the home network. The Block-0 live gate therefore runs **only on the NAS/local management node**.
 
-The self-hosted workflow runs on a Linux runner inside the home network. It must never upload the raw FRITZ!Box snapshot, host names, IP addresses, serial numbers or port-mapping details to GitHub.
+## Privacy contract
 
-`live_gate.py` therefore prints only:
+`live_gate.py` prints only:
 
-- numeric score and gate result
+- score and gate result
+- critical blocker names
 - FRITZ!Box reachable yes/no
-- host count and scan-complete yes/no
+- host count and inventory-complete yes/no
 - port-mapping count and scan-complete yes/no
+- remote-management scan completeness
+- number of USP controllers
 - error count
-- mutation gate state/reason
+- mutation-gate state
 
-The complete snapshot and audit record stay only in the local runner state directory.
+It never prints host names, IP addresses, MAC addresses, serial numbers, port numbers, controller hostnames, passwords or tokens.
 
-## Credentials
+The current full snapshot is local-only and written with mode 0600. The state directory is forced to 0700.
 
-Do not store the FRITZ!Box password as a repository secret for this local-first deployment.
+## Run
 
-If authentication is needed, configure it locally on the NAS runner in:
+```bash
+sudo -u aegis /opt/aegis/fritzbox-autoprotect-ai/.venv/bin/python \
+  /opt/aegis/fritzbox-autoprotect-ai/live_gate.py \
+  --config /etc/aegis/fritzbox-autoprotect.toml
+```
 
-`/etc/aegis/fritzbox-autoprotect.env`
+Exit code 0 means the Block-0 runtime gate passed. Exit code 20 means it remains locked.
 
-with permissions restricted to the runner/AEGIS service account. Example variable names:
+## Gate rules
 
-`AEGIS_FRITZ_USER`
-`AEGIS_FRITZ_PASSWORD`
+A numeric score alone is insufficient. Every critical Block-0 check must also be PASS:
 
-The workflow sources the local file without printing it.
+- local control plane reachable
+- remote-management scan complete and no disallowed exposure detected
+- WAN port-mapping scan complete
+- host inventory scan complete
+- audit chain valid
 
-## Gate
+UNKNOWN critical telemetry is a blocker.
 
-Block 0 runtime gate: score >= 70.
-
-A passing code CI does not satisfy this gate. A real read-only FRITZ!Box cycle from the home network is required.
+A passing source CI never substitutes for this local test.

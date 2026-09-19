@@ -20,37 +20,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  block0:
+  hardening:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
     defaults:
       run:
         working-directory: modules/fritzbox-autoprotect-ai
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: modules/fritzbox-autoprotect-ai/pyproject.toml
 
-      - name: Install test dependencies
-        run: python -m pip install -e '.[dev]'
+      - name: Install development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
 
       - name: Compile
-        run: python -m compileall -q block0.py mcp_server.py
+        run: python -m compileall -q block0.py live_gate.py mcp_server.py
 
-      - name: Unit tests
+      - name: Lint
+        run: ruff check block0.py live_gate.py mcp_server.py tests
+
+      - name: Static security scan
+        run: bandit -q -r block0.py live_gate.py mcp_server.py
+
+      - name: Unit and security regression tests
         run: pytest -q
 
       - name: Verify safe defaults
         run: |
           python - <<'PY'
-          from block0 import Config, validate_config
+          from block0 import Config, calculate_score, Check, validate_config
           cfg = Config()
           validate_config(cfg)
           assert cfg.mode == "observe"
           assert cfg.apply_enabled is False
           assert cfg.allow_remote_models is False
-          print("AEGIS AutoProtect safe defaults OK")
+          assert cfg.unknown_credit == 0.0
+          result = calculate_score([Check("critical", 100, "unknown", "", critical=True)], 70)
+          assert result["gate_passed"] is False
+          print("AEGIS AutoProtect fail-closed defaults OK")
           PY
+
+      - name: Audit production dependencies
+        if: matrix.python-version == '3.13'
+        run: pip-audit -r requirements-audit.txt --progress-spinner off

@@ -1,5 +1,5 @@
 [Unit]
-Description=AEGIS FRITZBox AutoProtect read-only observer
+Description=AEGIS AutoProtect local read-only network observer
 After=network-online.target
 Wants=network-online.target
 
@@ -7,14 +7,44 @@ Wants=network-online.target
 Type=oneshot
 User=aegis
 Group=aegis
+UMask=0077
+StateDirectory=aegis
+StateDirectoryMode=0700
 WorkingDirectory=/opt/aegis/fritzbox-autoprotect-ai
 EnvironmentFile=-/etc/aegis/fritzbox-autoprotect.env
 ExecStart=/opt/aegis/fritzbox-autoprotect-ai/.venv/bin/python /opt/aegis/fritzbox-autoprotect-ai/block0.py --config /etc/aegis/fritzbox-autoprotect.toml once
 NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/aegis/autoprotect
+ProtectHostname=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
 LockPersonality=true
 MemoryDenyWriteExecute=true
+RemoveIPC=true
+ReadWritePaths=/var/lib/aegis
+IPAddressDeny=any
+IPAddressAllow=127.0.0.0/8
+IPAddressAllow=10.0.0.0/8
+IPAddressAllow=172.16.0.0/12
+IPAddressAllow=192.168.0.0/16
+IPAddressAllow=::1/128
+IPAddressAllow=fc00::/7
+IPAddressAllow=fe80::/10
+
+[Install]
+WantedBy=multi-user.target

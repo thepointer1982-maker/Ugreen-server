@@ -3,8 +3,11 @@ mode = "observe"
 apply_enabled = false
 min_apply_score = 90.0
 required_stable_cycles = 3
+stable_max_age_seconds = 1800
 loop_interval_seconds = 300
+unknown_credit = 0.0
 state_dir = "/var/lib/aegis/autoprotect"
+audit_key_file = "/etc/aegis/autoprotect-audit.key"
 
 [fritzbox]
 base_url = "http://fritz.box:49000"
@@ -12,8 +15,11 @@ username = ""
 password_env = "AEGIS_FRITZ_PASSWORD"
 timeout_seconds = 8
 verify_tls = false
+allow_insecure_tls = false
+max_xml_bytes = 1048576
 max_hosts = 256
 max_port_mappings = 256
+max_usp_controllers = 16
 
 [network]
 forbid_wan_management = true
