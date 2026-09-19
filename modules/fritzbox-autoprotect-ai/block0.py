@@ -43,6 +43,14 @@ REMOTE_BOOL_KEYS = {
 SENSITIVE_KEY_PARTS = ("password", "passwd", "secret", "token", "privatekey")
 XML_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,127}$")
 SERVICE_URN_RE = re.compile(r"^urn:[A-Za-z0-9_.-]+:service:[A-Za-z0-9_.-]+:[0-9]+$")
+LOCAL_V4_NETWORKS = tuple(
+    ipaddress.ip_network(value)
+    for value in ("10.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16")
+)
+LOCAL_V6_NETWORKS = tuple(
+    ipaddress.ip_network(value)
+    for value in ("::1/128", "fc00::/7", "fe80::/10")
+)
 def _xml_text(value: Any) -> str:
     return html.escape(str(value), quote=False)
 
@@ -128,9 +136,8 @@ def load_config(path: str | None) -> Config:
 
 
 def _is_private_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return bool(ip.is_private or ip.is_loopback or ip.is_link_local) and not (
-        ip.is_multicast or ip.is_unspecified
-    )
+    networks = LOCAL_V4_NETWORKS if isinstance(ip, ipaddress.IPv4Address) else LOCAL_V6_NETWORKS
+    return any(ip in network for network in networks)
 
 
 def validate_network_url(url: str, label: str) -> None:
@@ -911,7 +918,7 @@ class Engine:
         self.fritz = FritzBox(cfg)
         self.fingerprint = config_fingerprint(cfg)
 
-    def _recent_stable_scores(self) -> list[float]:
+    def _recent_stable_scores(self, exclude_captured_at: str | None = None) -> list[float]:
         if not self.audit.verify():
             return []
         now = datetime.now(UTC)
@@ -920,6 +927,8 @@ class Engine:
             if record.get("config_fingerprint") != self.fingerprint:
                 break
             timestamp = record.get("captured_at")
+            if exclude_captured_at is not None and timestamp == exclude_captured_at:
+                continue
             try:
                 captured = datetime.fromisoformat(str(timestamp))
                 if captured.tzinfo is None:
@@ -939,7 +948,12 @@ class Engine:
                 break
         return scores
 
-    def mutation_gate(self, current: float, gate_passed: bool = True) -> tuple[bool, str]:
+    def mutation_gate(
+        self,
+        current: float,
+        gate_passed: bool = True,
+        exclude_captured_at: str | None = None,
+    ) -> tuple[bool, str]:
         if self.cfg.mode != "apply" or not self.cfg.apply_enabled:
             return False, "apply_disabled"
         if not gate_passed:
@@ -951,7 +965,7 @@ class Engine:
         if not self.audit.verify():
             return False, "audit_invalid"
         needed = max(0, self.cfg.required_stable_cycles - 1)
-        previous = self._recent_stable_scores()
+        previous = self._recent_stable_scores(exclude_captured_at=exclude_captured_at)
         if len(previous) < needed:
             return False, "insufficient_stable_cycles"
         if any(value < self.cfg.min_apply_score for value in previous[:needed]):
@@ -992,7 +1006,11 @@ class Engine:
             value = float(score.get("score"))
         except Exception:
             return False, "invalid_latest_score"
-        return self.mutation_gate(value, bool(score.get("gate_passed", False)))
+        return self.mutation_gate(
+            value,
+            bool(score.get("gate_passed", False)),
+            exclude_captured_at=str(latest.get("captured_at")),
+        )
 
     def once(self) -> dict[str, Any]:
         with exclusive_lock(self.state / ".cycle.lock"):
