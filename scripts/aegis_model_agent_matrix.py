@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import sqlite3
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,16 +26,31 @@ def has_table(conn: sqlite3.Connection, name: str) -> bool:
 def columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {str(row[1]) for row in conn.execute(f'PRAGMA table_info("{table}")')}
 
-def trace_rows(path: Path) -> list[dict[str, Any]]:
+def trace_rows(path: Path, *, since: float | None = None) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     conn = open_ro(path)
     try:
         if not has_table(conn, "traces"):
             return []
-        rows = conn.execute(
-            "SELECT agent, model, outcome, feedback, total_latency_seconds, total_tokens FROM traces"
-        ).fetchall()
+        cols = columns(conn, "traces")
+        required = {
+            "agent", "model", "outcome", "feedback",
+            "total_latency_seconds", "total_tokens",
+        }
+        if not required.issubset(cols):
+            return []
+        has_time = "started_at" in cols
+        sql = (
+            "SELECT agent, model, outcome, feedback, total_latency_seconds, total_tokens"
+            + (", started_at" if has_time else "")
+            + " FROM traces"
+        )
+        params: tuple[Any, ...] = ()
+        if since is not None and has_time:
+            sql += " WHERE started_at >= ?"
+            params = (float(since),)
+        rows = conn.execute(sql, params).fetchall()
         return [
             {
                 "agent": r[0] or "unknown",
@@ -43,13 +59,14 @@ def trace_rows(path: Path) -> list[dict[str, Any]]:
                 "feedback": r[3],
                 "latency": float(r[4] or 0.0),
                 "tokens": int(r[5] or 0),
+                "timestamp": float(r[6]) if len(r) > 6 and r[6] is not None else None,
             }
             for r in rows
         ]
     finally:
         conn.close()
 
-def telemetry_rows(path: Path) -> list[dict[str, Any]]:
+def telemetry_rows(path: Path, *, since: float | None = None) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     conn = open_ro(path)
@@ -64,10 +81,20 @@ def telemetry_rows(path: Path) -> list[dict[str, Any]]:
         missing = required - cols
         if missing:
             return []
-        where = " WHERE is_warmup=0" if "is_warmup" in cols else ""
+        has_time = "timestamp" in cols
+        clauses: list[str] = []
+        params: list[Any] = []
+        if "is_warmup" in cols:
+            clauses.append("is_warmup=0")
+        if since is not None and has_time:
+            clauses.append("timestamp >= ?")
+            params.append(float(since))
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = conn.execute(
-            "SELECT agent, model_id, latency_seconds, throughput_tok_per_sec, total_tokens, cost_usd, energy_joules "
-            "FROM telemetry" + where
+            "SELECT agent, model_id, latency_seconds, throughput_tok_per_sec, total_tokens, cost_usd, energy_joules"
+            + (", timestamp" if has_time else "")
+            + " FROM telemetry" + where,
+            params,
         ).fetchall()
         return [
             {
@@ -78,6 +105,7 @@ def telemetry_rows(path: Path) -> list[dict[str, Any]]:
                 "tokens": int(r[4] or 0),
                 "cost": float(r[5] or 0.0),
                 "energy": float(r[6] or 0.0),
+                "timestamp": float(r[7]) if len(r) > 7 and r[7] is not None else None,
             }
             for r in rows
         ]
@@ -87,7 +115,20 @@ def telemetry_rows(path: Path) -> list[dict[str, Any]]:
 def bounded(v: float) -> float:
     return max(0.0, min(1.0, v))
 
-def build_matrix(traces: list[dict[str,Any]], telemetry: list[dict[str,Any]], min_samples: int = 3) -> dict[str,Any]:
+def build_matrix(
+    traces: list[dict[str,Any]],
+    telemetry: list[dict[str,Any]],
+    min_samples: int = 3,
+    *,
+    max_age_seconds: int | None = None,
+    now_ts: float | None = None,
+) -> dict[str,Any]:
+    now_ts = time.time() if now_ts is None else float(now_ts)
+    cutoff = now_ts - max_age_seconds if max_age_seconds is not None else None
+    if cutoff is not None:
+        traces = [r for r in traces if r.get("timestamp") is None or float(r["timestamp"]) >= cutoff]
+        telemetry = [r for r in telemetry if r.get("timestamp") is None or float(r["timestamp"]) >= cutoff]
+
     groups: dict[tuple[str,str], dict[str,Any]] = defaultdict(lambda: {
         "trace_count":0,"successes":0,"feedback_sum":0.0,"feedback_n":0,
         "trace_latency_sum":0.0,"trace_tokens":0,
@@ -172,9 +213,11 @@ def build_matrix(traces: list[dict[str,Any]], telemetry: list[dict[str,Any]], mi
         if cur is None or r["composite_score"] > cur["composite_score"]:
             best_by_agent[r["agent"]] = r
     return {
-        "schema":"aegis-model-agent-matrix/v1",
+        "schema":"aegis-model-agent-matrix/v2",
         "generated_at":now_iso(),
         "min_samples":min_samples,
+        "max_age_seconds":max_age_seconds,
+        "cutoff_timestamp":cutoff,
         "rows":rows,
         "best_by_agent":best_by_agent,
     }
@@ -184,10 +227,19 @@ def main() -> int:
     p.add_argument("--trace-db", type=Path, required=True)
     p.add_argument("--telemetry-db", type=Path, required=True)
     p.add_argument("--min-samples", type=int, default=3)
+    p.add_argument("--max-age-hours", type=float, default=168.0)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
 
-    data = build_matrix(trace_rows(args.trace_db), telemetry_rows(args.telemetry_db), args.min_samples)
+    if args.max_age_hours <= 0:
+        raise SystemExit("--max-age-hours must be > 0")
+    cutoff = time.time() - args.max_age_hours * 3600.0
+    data = build_matrix(
+        trace_rows(args.trace_db, since=cutoff),
+        telemetry_rows(args.telemetry_db, since=cutoff),
+        args.min_samples,
+        max_age_seconds=int(args.max_age_hours * 3600.0),
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.output.with_suffix(args.output.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
