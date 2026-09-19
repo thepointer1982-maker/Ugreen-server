@@ -17,7 +17,7 @@ concurrency:
 jobs:
   nas-control:
     if: github.actor == 'thepointer1982-maker'
-    runs-on: [self-hosted, linux, x64, aegis-ugreen]
+    runs-on: [self-hosted, linux, aegis-ugreen]
     timeout-minutes: 30
 
     steps:
