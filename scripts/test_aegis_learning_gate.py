@@ -12,7 +12,10 @@ from aegis_provenance import attach_provenance, verify_provenance
 
 SCRIPT=Path(__file__).resolve().parent/"aegis_learning_gate.py"
 spec=importlib.util.spec_from_file_location("gate",SCRIPT)
-mod=importlib.util.module_from_spec(spec); assert spec and spec.loader; spec.loader.exec_module(mod)
+assert spec and spec.loader
+mod=importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = mod
+spec.loader.exec_module(mod)
 
 def main():
     r=mod.evaluate({"score":0.70,"safety":0.9},{"score":0.74,"safety":0.9},
