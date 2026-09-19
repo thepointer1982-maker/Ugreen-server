@@ -14,6 +14,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
 from aegis_local_ai_miner import REPORT as AI_REPORT
+from aegis_last_known_good import current, restore
 
 REPO_ROOT = Path(
     os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])
@@ -145,6 +146,18 @@ def model_agent_matrix() -> dict:
 def learning_gate_status() -> dict:
     """Return the latest fail-closed learning acceptance decision."""
     return _read_json(LEARNING_GATE_FILE, "not-yet-evaluated")
+
+
+@mcp.tool()
+def last_known_good_status() -> dict:
+    """Return the verified last-known-good pointer and artifact status."""
+    return current()
+
+
+@mcp.tool()
+def restore_last_known_good(destination: str) -> dict:
+    """Restore the verified last-known-good artifact to an explicit local destination."""
+    return restore(Path(destination).expanduser())
 
 
 @mcp.tool()
