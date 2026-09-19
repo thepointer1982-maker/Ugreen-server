@@ -24,6 +24,8 @@ on:
       - 'scripts/test_aegis_learning_gate.py'
       - 'scripts/aegis_provenance.py'
       - 'scripts/test_aegis_provenance.py'
+      - 'scripts/aegis_last_known_good.py'
+      - 'scripts/test_aegis_last_known_good.py'
       - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   pull_request:
@@ -76,6 +78,9 @@ jobs:
       - name: Run AEGIS provenance regression tests
         run: python3 scripts/test_aegis_provenance.py
 
+      - name: Run AEGIS last-known-good regression tests
+        run: python3 scripts/test_aegis_last_known_good.py
+
       - name: Run AEGIS local AI miner regression tests
         run: python3 scripts/test_aegis_local_ai_miner.py
 
@@ -85,8 +90,8 @@ jobs:
       - name: Run AEGIS learning gate regression tests
         run: python3 scripts/test_aegis_learning_gate.py
 
-      - name: Compile guardian, provenance, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_provenance.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_provenance.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+      - name: Compile guardian, provenance, LKG, miner, matrix, gate and MCP modules
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
@@ -102,7 +107,7 @@ jobs:
           from mcp.server import MCPServer
           if not isinstance(mod.mcp, MCPServer):
               raise SystemExit('mcp object is not an MCPServer')
-          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'learning_cards', 'run_guardian_cycle'):
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'run_guardian_cycle'):
               if not callable(getattr(mod, name, None)):
                   raise SystemExit(f'MCP callable missing: {name}')
           print('AEGIS MCP v2 public import contract OK')
