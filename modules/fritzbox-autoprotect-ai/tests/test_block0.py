@@ -277,3 +277,12 @@ def test_latest_binding_detects_snapshot_tamper(tmp_path):
     record["snapshot"]["reachable"] = False
     secure_atomic_write(tmp_path / "latest.json", json.dumps(record))
     assert engine.latest() is None
+
+
+def test_zero_remote_services_never_counts_as_complete_scan():
+    fritz = FritzBox(Config(fritz_url="http://192.168.178.1:49000"))
+    snap = Snapshot(reachable=True)
+    fritz._probe_remote([], snap)
+    assert snap.remote_services_seen == 0
+    assert snap.remote_scan_complete is False
+    assert "remote_services:none" in snap.errors
