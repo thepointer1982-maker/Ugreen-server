@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import importlib.util
+import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from aegis_provenance import attach_provenance, verify_provenance
 
 SCRIPT=Path(__file__).resolve().parent/"aegis_learning_gate.py"
 spec=importlib.util.spec_from_file_location("gate",SCRIPT)
@@ -30,6 +37,14 @@ def main():
 
     r=mod.evaluate({"score":1.0},{"score":2.0},score_scale=0.0)
     assert not r.accepted and r.reason=="invalid-score-scale"
+
+    baseline = attach_provenance({"score":0.70}, kind="eval-baseline")
+    candidate = attach_provenance({"score":0.74}, kind="eval-candidate")
+    assert verify_provenance(baseline)[0]
+    assert verify_provenance(candidate)[0]
+    tampered = dict(candidate)
+    tampered["score"] = 0.99
+    assert not verify_provenance(tampered)[0]
 
     print("AEGIS LEARNING GATE TESTS PASS")
 
