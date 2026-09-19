@@ -345,6 +345,8 @@ class HashAudit:
             return "CORRUPT"
 
     def append(self, record: dict[str, Any]) -> str:
+        if self.path.exists() and not self.verify():
+            raise RuntimeError("audit chain cannot be verified; refusing append")
         previous = self.last_hash()
         if previous == "CORRUPT":
             raise RuntimeError("audit chain is corrupt; refusing append")
@@ -862,6 +864,11 @@ def route_model(cfg: Config, task: str, memory_gb: float) -> dict[str, Any]:
     }
 
 
+def snapshot_digest(snapshot: dict[str, Any]) -> str:
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def public_summary(record: dict[str, Any]) -> dict[str, Any]:
     snapshot = record.get("snapshot", {})
     score = record.get("score", {})
@@ -940,14 +947,30 @@ class Engine:
             return False, "unstable_prior_score"
         return True, "open"
 
+    def _latest_binding_valid(self, record: dict[str, Any]) -> bool:
+        records = self.audit.records()
+        if not records:
+            return False
+        anchor = records[-1]
+        try:
+            return (
+                anchor.get("captured_at") == record.get("captured_at")
+                and anchor.get("config_fingerprint") == record.get("config_fingerprint")
+                and anchor.get("snapshot_digest") == snapshot_digest(record.get("snapshot", {}))
+                and anchor.get("score") == record.get("score")
+            )
+        except Exception:
+            return False
+
     def latest(self) -> dict[str, Any] | None:
         path = self.state / "latest.json"
         if not path.exists() or path.is_symlink():
             return None
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            record = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return None
+        return record if self._latest_binding_valid(record) else None
 
     def current_mutation_gate(self) -> tuple[bool, str]:
         latest = self.latest()
@@ -970,17 +993,28 @@ class Engine:
                 unknown_credit=self.cfg.unknown_credit,
             )
             allowed, reason = self.mutation_gate(result["score"], result["gate_passed"])
+            snapshot_data = asdict(snapshot)
             record = {
                 "schema_version": 2,
                 "captured_at": snapshot.captured_at,
                 "config_fingerprint": self.fingerprint,
-                "snapshot": asdict(snapshot),
+                "snapshot": snapshot_data,
                 "score": result,
                 "audit_integrity": self.audit.integrity_mode,
                 "mutation_allowed": allowed,
                 "mutation_reason": reason,
             }
-            entry_hash = self.audit.append(record)
+            audit_record = {
+                "schema_version": 2,
+                "captured_at": snapshot.captured_at,
+                "config_fingerprint": self.fingerprint,
+                "snapshot_digest": snapshot_digest(snapshot_data),
+                "score": result,
+                "audit_integrity": self.audit.integrity_mode,
+                "mutation_allowed": allowed,
+                "mutation_reason": reason,
+            }
+            entry_hash = self.audit.append(audit_record)
             with _secure_open_append(self.state / "scores.jsonl") as fh:
                 fh.write(
                     json.dumps(
@@ -1011,6 +1045,13 @@ class Engine:
             if latest.exists() and not latest.is_symlink()
             else None
         )
+        latest_record = None
+        latest_path = self.state / "latest.json"
+        if latest_path.exists() and not latest_path.is_symlink():
+            try:
+                latest_record = json.loads(latest_path.read_text(encoding="utf-8"))
+            except Exception:
+                latest_record = None
         return {
             "config_valid": True,
             "state_dir_mode": oct(mode),
@@ -1019,6 +1060,7 @@ class Engine:
             "latest_private": latest_mode is None or latest_mode & 0o077 == 0,
             "audit_valid": self.audit.verify(),
             "audit_integrity": self.audit.integrity_mode,
+            "latest_bound_to_audit": bool(latest_record) and self._latest_binding_valid(latest_record),
             "apply_enabled": self.cfg.mode == "apply" and self.cfg.apply_enabled,
             "remote_models_enabled": self.cfg.allow_remote_models,
         }
