@@ -1,0 +1,20 @@
+[Unit]
+Description=AEGIS FRITZBox AutoProtect read-only observer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis/fritzbox-autoprotect-ai
+EnvironmentFile=-/etc/aegis/fritzbox-autoprotect.env
+ExecStart=/opt/aegis/fritzbox-autoprotect-ai/.venv/bin/python /opt/aegis/fritzbox-autoprotect-ai/block0.py --config /etc/aegis/fritzbox-autoprotect.toml once
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/aegis/autoprotect
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
