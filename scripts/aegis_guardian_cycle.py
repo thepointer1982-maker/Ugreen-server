@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ STATE_DIR = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", Path.home() / ".loca
 STATUS_FILE = STATE_DIR / "status.json"
 CARDS_FILE = STATE_DIR / "learning-cards.jsonl"
 INDEX_FILE = STATE_DIR / "learning-index.json"
+LEARNING_LOCK = STATE_DIR / "learning.lock"
 AI_MINER_REPORT = Path(os.environ.get(
     "AEGIS_AI_MINER_REPORT",
     Path.home() / ".local/state/aegis-ai-miner/latest.json",
@@ -88,25 +90,39 @@ def fingerprint(event: dict[str, Any]) -> str:
 
 def append_learning_card(event: dict[str, Any]) -> dict[str, Any]:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    index = read_json(INDEX_FILE)
-    fp = fingerprint(event)
-    previous = index.get(fp, {}) if isinstance(index.get(fp), dict) else {}
-    recurrence = int(previous.get("recurrence", 0)) + 1
-    card = {
-        "schema": "aegis-learning-card/v1",
-        "id": f"{int(time.time())}-{fp}",
-        "fingerprint": fp,
-        "created_at": now_iso(),
-        "recurrence": recurrence,
-        **event,
-    }
-    with CARDS_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(card, ensure_ascii=False, sort_keys=True) + "\n")
-    index[fp] = {"recurrence": recurrence, "last_seen": card["created_at"], "last_outcome": card.get("outcome")}
-    tmp = INDEX_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    tmp.replace(INDEX_FILE)
-    return card
+    with LEARNING_LOCK.open("a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            index = read_json(INDEX_FILE)
+            fp = fingerprint(event)
+            previous = index.get(fp, {}) if isinstance(index.get(fp), dict) else {}
+            recurrence = parse_nonnegative_int(str(previous.get("recurrence", 0)), 0) + 1
+            card = {
+                "schema": "aegis-learning-card/v1",
+                "id": f"{time.time_ns()}-{fp}",
+                "fingerprint": fp,
+                "created_at": now_iso(),
+                "recurrence": recurrence,
+                **event,
+            }
+            with CARDS_FILE.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(card, ensure_ascii=False, sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            index[fp] = {
+                "recurrence": recurrence,
+                "last_seen": card["created_at"],
+                "last_outcome": card.get("outcome"),
+            }
+            tmp = INDEX_FILE.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps(index, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            tmp.replace(INDEX_FILE)
+            return card
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
 
 def safe_repairs(
