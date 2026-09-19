@@ -71,7 +71,7 @@ class SchedulerTests(unittest.TestCase):
 
     def test_scheduler_records_real_shell_pid(self):
         text = WRAPPER.read_text(encoding="utf-8")
-        self.assertIn('printf \'pid=%s\\nboot_id=%s\\n\' "$" "$BOOT_ID"', text)
+        self.assertIn('printf \'pid=%s\\nboot_id=%s\\n\' "$$" "$BOOT_ID"', text)
         self.assertNotIn('printf \'pid=%s\\nboot_id=%s\\n\' "$" "$BOOT_ID"', text)
 
     def test_live_lock_owner_is_not_recovered(self):
