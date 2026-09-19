@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from aegis_provenance import attach_provenance
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00","Z")
 
@@ -257,6 +259,20 @@ def main() -> int:
         args.min_samples,
         max_age_seconds=int(args.max_age_hours * 3600.0),
     )
+    source_fingerprints = {
+        "trace_db": {
+            "path": str(args.trace_db),
+            "size_bytes": args.trace_db.stat().st_size if args.trace_db.exists() else None,
+            "mtime": args.trace_db.stat().st_mtime if args.trace_db.exists() else None,
+        },
+        "telemetry_db": {
+            "path": str(args.telemetry_db),
+            "size_bytes": args.telemetry_db.stat().st_size if args.telemetry_db.exists() else None,
+            "mtime": args.telemetry_db.stat().st_mtime if args.telemetry_db.exists() else None,
+        },
+    }
+    data["source_fingerprints"] = source_fingerprints
+    data = attach_provenance(data, kind="model-agent-matrix")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.output.with_suffix(args.output.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
