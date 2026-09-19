@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import os
+import subprocess
+from pathlib import Path
+
+SCRIPT = Path(__file__).resolve().parent / "aegis_runner_install.sh"
+WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "aegis-nas-control.yml"
+
+def main():
+    p = subprocess.run(["bash", str(SCRIPT), "--help"], text=True, capture_output=True)
+    assert p.returncode == 0
+    assert "token is never written" in p.stdout
+    assert "aegis-ugreen-v2" in p.stdout
+
+    env = os.environ.copy()
+    env.pop("AEGIS_RUNNER_TOKEN", None)
+    p = subprocess.run(["bash", str(SCRIPT)], text=True, capture_output=True, env=env)
+    assert p.returncode == 4
+    assert "AEGIS_RUNNER_TOKEN missing" in p.stderr
+
+    w = WORKFLOW.read_text(encoding="utf-8")
+    assert "runs-on: [self-hosted, linux, aegis-ugreen-v2]" in w
+    assert "github.actor == 'thepointer1982-maker'" in w
+    assert "pull_request:" not in w
+    assert 'allowed = {"status", "real-cycle", "deploy-retry"}' in w
+    assert "trusted_sha" in w
+    assert "merge-base --is-ancestor" in w
+    assert 'git -C "$REPO" clean -fdx' in w
+    assert "AEGIS_REPO_PATH=$REPO" in w
+    assert "curl " not in w
+    print("AEGIS RUNNER CONTROL TESTS PASS")
+
+if __name__ == "__main__":
+    main()

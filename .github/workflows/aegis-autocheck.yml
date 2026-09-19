@@ -11,8 +11,38 @@ on:
       - 'scripts/aegis_nas_run_once.sh'
       - 'scripts/aegis_scheduled_run.sh'
       - 'scripts/aegis_scheduler_install.sh'
+      - 'scripts/aegis_guardian_cycle.py'
+      - 'scripts/test_aegis_real_cycle.py'
+      - 'scripts/aegis_real_cycle.py'
+      - 'scripts/test_aegis_deploy_local.py'
+      - 'scripts/aegis_deploy_local.sh'
+      - 'scripts/test_aegis_remote_apply_retry.py'
+      - 'scripts/aegis_remote_apply_retry.sh'
+      - 'scripts/test_aegis_runner_control.py'
+      - 'scripts/aegis_runner_install.sh'
+      - 'scripts/test_aegis_access_bootstrap.py'
+      - 'scripts/aegis_access_bootstrap.sh'
+      - '.github/workflows/aegis-nas-control.yml'
+      - 'scripts/test_aegis_tailscale_bridge.py'
+      - 'scripts/aegis_tailscale_bridge.sh'
+      - 'deploy/tailscale/docker-compose.yml'
+      - 'scripts/test_aegis_real_status.py'
+      - 'scripts/aegis_real_status.py'
+      - 'scripts/aegis_mcp_server.py'
+      - 'scripts/aegis_local_ai_miner.py'
       - 'scripts/test_aegis_pipeline.py'
       - 'scripts/test_aegis_scheduler.py'
+      - 'scripts/test_aegis_guardian.py'
+      - 'scripts/test_aegis_local_ai_miner.py'
+      - 'scripts/aegis_model_agent_matrix.py'
+      - 'scripts/test_aegis_model_agent_matrix.py'
+      - 'scripts/aegis_learning_gate.py'
+      - 'scripts/test_aegis_learning_gate.py'
+      - 'scripts/aegis_provenance.py'
+      - 'scripts/test_aegis_provenance.py'
+      - 'scripts/aegis_last_known_good.py'
+      - 'scripts/test_aegis_last_known_good.py'
+      - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   pull_request:
     paths:
@@ -23,8 +53,22 @@ on:
       - 'scripts/aegis_nas_run_once.sh'
       - 'scripts/aegis_scheduled_run.sh'
       - 'scripts/aegis_scheduler_install.sh'
+      - 'scripts/aegis_guardian_cycle.py'
+      - 'scripts/aegis_mcp_server.py'
+      - 'scripts/aegis_local_ai_miner.py'
       - 'scripts/test_aegis_pipeline.py'
       - 'scripts/test_aegis_scheduler.py'
+      - 'scripts/test_aegis_guardian.py'
+      - 'scripts/test_aegis_local_ai_miner.py'
+      - 'scripts/aegis_model_agent_matrix.py'
+      - 'scripts/test_aegis_model_agent_matrix.py'
+      - 'scripts/aegis_learning_gate.py'
+      - 'scripts/test_aegis_learning_gate.py'
+      - 'scripts/aegis_provenance.py'
+      - 'scripts/test_aegis_provenance.py'
+      - 'scripts/aegis_last_known_good.py'
+      - 'scripts/test_aegis_last_known_good.py'
+      - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
 
@@ -47,6 +91,77 @@ jobs:
 
       - name: Run AEGIS scheduler regression tests
         run: python3 scripts/test_aegis_scheduler.py
+
+      - name: Run AEGIS real-cycle regression tests
+        run: python3 scripts/test_aegis_real_cycle.py
+
+      - name: Run AEGIS local deploy regression tests
+        run: python3 scripts/test_aegis_deploy_local.py
+
+      - name: Run AEGIS remote retry regression tests
+        run: python3 scripts/test_aegis_remote_apply_retry.py
+
+      - name: Run AEGIS Tailscale bridge regression tests
+        run: python3 scripts/test_aegis_tailscale_bridge.py
+
+      - name: Run AEGIS runner control regression tests
+        run: python3 scripts/test_aegis_runner_control.py
+
+      - name: Run AEGIS real-status regression tests
+        run: python3 scripts/test_aegis_real_status.py
+
+      - name: Validate hardened shell syntax
+        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
+
+      - name: Run AEGIS guardian regression tests
+        run: python3 scripts/test_aegis_guardian.py
+
+      - name: Run AEGIS provenance regression tests
+        run: python3 scripts/test_aegis_provenance.py
+
+      - name: Run AEGIS last-known-good regression tests
+        run: python3 scripts/test_aegis_last_known_good.py
+
+      - name: Run AEGIS local AI miner regression tests
+        run: python3 scripts/test_aegis_local_ai_miner.py
+
+      - name: Run AEGIS model-agent matrix regression tests
+        run: python3 scripts/test_aegis_model_agent_matrix.py
+
+      - name: Run AEGIS learning gate regression tests
+        run: python3 scripts/test_aegis_learning_gate.py
+
+      - name: Compile guardian, deploy, retry, runner, tunnel, access, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+
+      - name: Validate MCP v2 module
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check "mcp[cli]>=2,<3"
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path = Path('scripts/aegis_mcp_server.py')
+          spec = importlib.util.spec_from_file_location('aegis_mcp_server', path)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          from mcp.server import MCPServer
+          if not isinstance(mod.mcp, MCPServer):
+              raise SystemExit('mcp object is not an MCPServer')
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'run_guardian_cycle'):
+              if not callable(getattr(mod, name, None)):
+                  raise SystemExit(f'MCP callable missing: {name}')
+          import os
+          os.environ.pop('AEGIS_LKG_MCP_TARGET', None)
+          blocked = mod.restore_last_known_good()
+          if blocked.get('status') != 'blocked' or blocked.get('reason') != 'mcp-rollback-target-not-configured':
+              raise SystemExit(f'MCP rollback fail-closed contract broken: {blocked}')
+          os.environ.pop('AEGIS_LKG_ACTIVATION_TARGET', None)
+          blocked_activation = mod.activate_last_known_good()
+          if blocked_activation.get('status') != 'blocked' or blocked_activation.get('reason') != 'activation-target-not-configured':
+              raise SystemExit(f'MCP activation fail-closed contract broken: {blocked_activation}')
+          print('AEGIS MCP v2 public import, rollback and activation contract OK')
+          PY
 
       - name: Detect real score data
         id: detect
