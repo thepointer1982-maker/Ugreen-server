@@ -18,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_provenance import verify_provenance
+from aegis_last_known_good import provisional_status, observe_provisional
 
 STATE_DIR = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", Path.home() / ".local/state/aegis-guardian"))
 STATUS_FILE = STATE_DIR / "status.json"
@@ -162,6 +163,19 @@ def shutil_which(name: str) -> str | None:
     return shutil.which(name)
 
 
+def probation_passes(status: dict[str, Any]) -> bool:
+    if status.get("mode") != "healthy":
+        return False
+    evidence = status.get("evidence")
+    if not isinstance(evidence, dict):
+        return False
+    if evidence.get("evidence_verified") is False:
+        return False
+    if evidence.get("local_ai_provenance_verified") is False:
+        return False
+    return True
+
+
 def classify(failures: int, preflight_rc: int, cycle_rc: int | None) -> tuple[str, str]:
     if failures >= 5:
         return "emergency", "repeated-failures"
@@ -262,6 +276,27 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
             "allowed_repairs": ["restart-aegis-export-service"],
         },
     }
+
+    provisional = provisional_status()
+    if provisional.get("status") == "ok":
+        raw_target = os.environ.get("AEGIS_LKG_MCP_TARGET")
+        rollback_target = Path(raw_target).expanduser() if raw_target else None
+        status["probation"] = observe_provisional(
+            passed=probation_passes(status),
+            evidence={
+                "guardian_mode": status.get("mode"),
+                "guardian_reason": status.get("reason"),
+                "network_score": status["evidence"].get("network_score"),
+                "evidence_verified": status["evidence"].get("evidence_verified"),
+                "local_ai_provenance_verified": status["evidence"].get("local_ai_provenance_verified"),
+            },
+            rollback_destination=rollback_target,
+        )
+        if status["probation"].get("status") == "rejected":
+            status["mode"] = "blocked"
+            status["reason"] = "provisional-regression-rollback"
+    else:
+        status["probation"] = {"status": "none"}
 
     tmp = STATUS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(status, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
