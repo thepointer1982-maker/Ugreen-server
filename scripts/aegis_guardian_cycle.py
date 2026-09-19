@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from aegis_provenance import verify_provenance
+
 STATE_DIR = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", Path.home() / ".local/state/aegis-guardian"))
 STATUS_FILE = STATE_DIR / "status.json"
 CARDS_FILE = STATE_DIR / "learning-cards.jsonl"
@@ -205,8 +207,16 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
     latest = read_json(repo / "scores/latest.json")
     autocheck = read_json(repo / "dashboard/autocheck.json")
     ai_report = read_json(AI_MINER_REPORT)
+    ai_provenance_ok = False
+    ai_provenance_reason = "not-present"
+    if ai_report:
+        ai_provenance_ok, ai_provenance_reason = verify_provenance(ai_report)
     ai_findings = ai_report.get("findings", []) if isinstance(ai_report.get("findings"), list) else []
     ai_codes = [f.get("code") for f in ai_findings if isinstance(f, dict) and f.get("code")]
+    if ai_report and not ai_provenance_ok:
+        mode = "blocked"
+        reason = "local-ai-provenance-invalid"
+        ai_codes.append("LOCAL_AI_PROVENANCE_INVALID")
     status = {
         "schema": "aegis-guardian-status/v1",
         "generated_at": now_iso(),
@@ -233,6 +243,13 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
             "deepdiag_score": autocheck.get("deepdiag_score"),
             "priority_findings": len(autocheck.get("priority_findings", [])) if isinstance(autocheck.get("priority_findings"), list) else None,
             "local_ai_findings": ai_codes,
+            "local_ai_provenance_verified": ai_provenance_ok if ai_report else None,
+            "local_ai_provenance_reason": ai_provenance_reason if ai_report else None,
+            "local_ai_sha256": (
+                ai_report.get("_provenance", {}).get("sha256")
+                if isinstance(ai_report.get("_provenance"), dict)
+                else None
+            ),
             "ollama_reachable": ai_report.get("ollama", {}).get("reachable") if isinstance(ai_report.get("ollama"), dict) else None,
             "ollama_model_count": len(ai_report.get("ollama", {}).get("models", [])) if isinstance(ai_report.get("ollama"), dict) and isinstance(ai_report.get("ollama", {}).get("models"), list) else None,
             "local_ai_db_count": len(ai_report.get("inventory", {}).get("sqlite_databases", [])) if isinstance(ai_report.get("inventory"), dict) and isinstance(ai_report.get("inventory", {}).get("sqlite_databases"), list) else None,
