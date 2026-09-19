@@ -1,5 +1,6 @@
 import json
 import stat
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -8,6 +9,7 @@ import pytest
 from block0 import (
     Check,
     Config,
+    Engine,
     FritzBox,
     HashAudit,
     Snapshot,
@@ -18,6 +20,7 @@ from block0 import (
     remote_exposure,
     secure_atomic_write,
     secure_state_dir,
+    snapshot_digest,
     validate_config,
 )
 
@@ -230,8 +233,6 @@ def test_audit_refuses_append_when_existing_chain_cannot_be_verified():
 
 
 def test_latest_binding_detects_snapshot_tamper(tmp_path):
-    from block0 import Engine, snapshot_digest
-
     cfg = Config(state_dir=str(tmp_path), audit_key_file=str(tmp_path / "missing.key"))
     engine = Engine(cfg)
     snapshot = {
@@ -286,3 +287,66 @@ def test_zero_remote_services_never_counts_as_complete_scan():
     assert snap.remote_services_seen == 0
     assert snap.remote_scan_complete is False
     assert "remote_services:none" in snap.errors
+
+
+def test_reserved_non_lan_ip_is_rejected():
+    with pytest.raises(ValueError):
+        validate_config(Config(fritz_url="http://192.0.2.1:49000"))
+
+
+def test_current_audited_cycle_is_not_double_counted_for_stability(tmp_path):
+    key_path = tmp_path / "audit.key"
+    key_path.write_bytes(b"k" * 32)
+    key_path.chmod(0o600)
+    cfg = Config(
+        mode="apply",
+        apply_enabled=True,
+        min_apply_score=70,
+        required_stable_cycles=3,
+        state_dir=str(tmp_path / "state"),
+        audit_key_file=str(key_path),
+    )
+    engine = Engine(cfg)
+    now = datetime.now(UTC)
+    captured = [
+        (now - timedelta(seconds=20)).isoformat(),
+        (now - timedelta(seconds=10)).isoformat(),
+    ]
+    for timestamp in captured:
+        engine.audit.append(
+            {
+                "schema_version": 2,
+                "captured_at": timestamp,
+                "config_fingerprint": engine.fingerprint,
+                "snapshot_digest": "0" * 64,
+                "score": {"score": 90.0, "gate_passed": True},
+                "audit_integrity": "hmac-sha256",
+                "mutation_allowed": False,
+                "mutation_reason": "test",
+            }
+        )
+
+    allowed, reason = engine.mutation_gate(
+        90.0,
+        True,
+        exclude_captured_at=captured[-1],
+    )
+    assert allowed is False
+    assert reason == "insufficient_stable_cycles"
+
+    third = now.isoformat()
+    engine.audit.append(
+        {
+            "schema_version": 2,
+            "captured_at": third,
+            "config_fingerprint": engine.fingerprint,
+            "snapshot_digest": "0" * 64,
+            "score": {"score": 90.0, "gate_passed": True},
+            "audit_integrity": "hmac-sha256",
+            "mutation_allowed": False,
+            "mutation_reason": "test",
+        }
+    )
+    allowed, reason = engine.mutation_gate(90.0, True, exclude_captured_at=third)
+    assert allowed is True
+    assert reason == "open"
