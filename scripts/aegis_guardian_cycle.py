@@ -139,16 +139,10 @@ def safe_repairs(
     allow_service_restart: bool,
 ) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
-    lock = scheduler_dir / "run.lock"
-    if lock.is_dir():
-        age = time.time() - lock.stat().st_mtime
-        if age > STALE_LOCK_SECONDS:
-            try:
-                lock.rmdir()
-                actions.append({"action": "remove-stale-empty-scheduler-lock", "ok": True})
-            except OSError as exc:
-                actions.append({"action": "remove-stale-empty-scheduler-lock", "ok": False, "error": str(exc)})
 
+    # Scheduler lock recovery belongs exclusively to aegis_scheduled_run.sh.
+    # The guardian must not independently delete scheduler locks because the
+    # scheduler validates PID + boot-id ownership before recovery.
     if allow_service_restart and shutil_which("systemctl"):
         unit_known = run(["systemctl", "--user", "list-unit-files", SAFE_SERVICE], cwd=repo, timeout=30)
         if unit_known.returncode == 0 and SAFE_SERVICE in unit_known.stdout:
@@ -265,7 +259,7 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
             "efi_changes": False,
             "formatting": False,
             "internet_exposure": False,
-            "allowed_repairs": ["remove-stale-empty-scheduler-lock", "restart-aegis-export-service"],
+            "allowed_repairs": ["restart-aegis-export-service"],
         },
     }
 
