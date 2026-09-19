@@ -1,6 +1,7 @@
+import json
+import stat
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import stat
 
 import pytest
 
@@ -230,7 +231,6 @@ def test_audit_refuses_append_when_existing_chain_cannot_be_verified():
 
 def test_latest_binding_detects_snapshot_tamper(tmp_path):
     from block0 import Engine, snapshot_digest
-    import json
 
     cfg = Config(state_dir=str(tmp_path), audit_key_file=str(tmp_path / "missing.key"))
     engine = Engine(cfg)
