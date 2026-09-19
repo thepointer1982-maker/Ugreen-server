@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import tempfile
+from pathlib import Path
+
+
+SCRIPT = Path(__file__).resolve().parent / "aegis_guardian_cycle.py"
+spec = importlib.util.spec_from_file_location("aegis_guardian_cycle", SCRIPT)
+mod = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(mod)
+
+
+def main() -> None:
+    assert mod.classify(0, 0, 0) == ("healthy", "verified-cycle")
+    assert mod.classify(3, 0, 7) == ("degraded", "persistent-failures")
+    assert mod.classify(5, 0, 7) == ("emergency", "repeated-failures")
+    assert mod.classify(0, 20, None) == ("blocked", "preflight-blocked")
+
+    with tempfile.TemporaryDirectory() as raw:
+        state = Path(raw)
+        mod.STATE_DIR = state
+        mod.CARDS_FILE = state / "learning-cards.jsonl"
+        mod.INDEX_FILE = state / "learning-index.json"
+        a = mod.append_learning_card({"mode":"degraded","reason":"x","action":"observe","outcome":"degraded","rc":2})
+        b = mod.append_learning_card({"mode":"degraded","reason":"x","action":"observe","outcome":"degraded","rc":2})
+        assert a["recurrence"] == 1
+        assert b["recurrence"] == 2
+        rows = [json.loads(x) for x in mod.CARDS_FILE.read_text().splitlines()]
+        assert len(rows) == 2
+        assert rows[-1]["fingerprint"] == rows[0]["fingerprint"]
+
+    print("AEGIS GUARDIAN TESTS PASS")
+
+
+if __name__ == "__main__":
+    main()
