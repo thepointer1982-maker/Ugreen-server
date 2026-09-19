@@ -144,6 +144,22 @@ def stage_provisional(
     if snap.get("status") != "snapshotted":
         return snap
 
+    existing = provisional_status()
+    if existing.get("status") == "ok":
+        existing_sha = existing.get("provisional", {}).get("sha256")
+        if existing_sha == snap["sha256"]:
+            return {
+                "status": "provisional",
+                "provisional": existing["provisional"],
+                "idempotent": True,
+            }
+        return {
+            "status": "blocked",
+            "reason": "provisional-already-in-progress",
+            "existing_sha256": existing_sha,
+            "candidate_sha256": snap["sha256"],
+        }
+
     previous = current()
     previous_sha = (
         previous.get("pointer", {}).get("sha256")
@@ -237,7 +253,10 @@ def observe_provisional(
             "failures": failures,
         }
         if rollback_destination is not None:
-            result["rollback"] = restore(rollback_destination)
+            result["rollback"] = {
+                "status": "not-needed",
+                "reason": "provisional-was-never-activated",
+            }
         provisional["state"] = "rejected"
         provisional["passes"] = passes
         provisional["failures"] = failures
@@ -380,6 +399,27 @@ def activate_current_lkg(
             "status": "blocked",
             "reason": cur.get("reason", "no-valid-lkg"),
         }
+
+    existing_active = active_status()
+    if existing_active.get("status") == "ok":
+        existing_state = existing_active.get("active", {}).get("state")
+        existing_sha = existing_active.get("active", {}).get("sha256")
+        existing_destination = existing_active.get("active", {}).get("destination")
+        if existing_state == "validating":
+            if (
+                existing_sha == cur["pointer"].get("sha256")
+                and existing_destination == str(destination)
+            ):
+                return {
+                    "status": "activated-validating",
+                    "active": existing_active["active"],
+                    "idempotent": True,
+                }
+            return {
+                "status": "blocked",
+                "reason": "activation-already-validating",
+                "existing_sha256": existing_sha,
+            }
 
     pointer = cur["pointer"]
     source = Path(pointer["artifact"])
