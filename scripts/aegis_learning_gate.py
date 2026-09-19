@@ -33,6 +33,7 @@ def evaluate(
     *,
     score_key: str = "score",
     min_improvement: float = 0.02,
+    score_scale: float = 1.0,
     regression_keys: list[str] | None = None,
     max_regression: float = 0.0,
 ) -> GateResult:
@@ -42,7 +43,9 @@ def evaluate(
     if b is None or c is None:
         return GateResult(False, "blocked", "missing-or-invalid-eval-score", None, [])
 
-    improvement = c - b
+    if score_scale <= 0:
+        return GateResult(False, "blocked", "invalid-score-scale", None, [])
+    improvement = (c - b) / score_scale
     regressions: list[str] = []
     for key in regression_keys:
         bv, cv = number(baseline, key), number(candidate, key)
@@ -64,6 +67,7 @@ def main() -> int:
     p.add_argument("--candidate", type=Path, required=True)
     p.add_argument("--score-key", default="score")
     p.add_argument("--min-improvement", type=float, default=0.02)
+    p.add_argument("--score-scale", type=float, default=1.0, help="1 for 0..1 scores, 100 for 0..100 scores.")
     p.add_argument("--regression-key", action="append", default=[])
     p.add_argument("--max-regression", type=float, default=0.0)
     p.add_argument("--output", type=Path)
@@ -74,6 +78,7 @@ def main() -> int:
         load(args.candidate),
         score_key=args.score_key,
         min_improvement=args.min_improvement,
+        score_scale=args.score_scale,
         regression_keys=args.regression_key,
         max_regression=args.max_regression,
     )
@@ -87,6 +92,7 @@ def main() -> int:
         "policy":{
             "fail_closed":True,
             "min_improvement":args.min_improvement,
+            "score_scale":args.score_scale,
             "score_key":args.score_key,
             "regression_keys":args.regression_key,
             "max_regression":args.max_regression,
