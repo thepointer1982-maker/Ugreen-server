@@ -40,6 +40,10 @@ on:
       - 'scripts/test_aegis_scheduler.py'
       - 'scripts/test_aegis_guardian.py'
       - 'scripts/test_aegis_local_ai_miner.py'
+      - 'scripts/aegis_model_agent_matrix.py'
+      - 'scripts/test_aegis_model_agent_matrix.py'
+      - 'scripts/aegis_learning_gate.py'
+      - 'scripts/test_aegis_learning_gate.py'
       - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
