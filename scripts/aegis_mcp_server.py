@@ -14,7 +14,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
 from aegis_local_ai_miner import REPORT as AI_REPORT
-from aegis_last_known_good import current, restore
+from aegis_last_known_good import current, provisional_status, observe_provisional, restore
 
 REPO_ROOT = Path(
     os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])
@@ -146,6 +146,24 @@ def model_agent_matrix() -> dict:
 def learning_gate_status() -> dict:
     """Return the latest fail-closed learning acceptance decision."""
     return _read_json(LEARNING_GATE_FILE, "not-yet-evaluated")
+
+
+@mcp.tool()
+def provisional_learning_status() -> dict:
+    """Return the current provisional candidate and probation counters."""
+    return provisional_status()
+
+
+@mcp.tool()
+def record_probation_result(passed: bool) -> dict:
+    """Record one measured probation result for the provisional candidate."""
+    raw_target = os.environ.get("AEGIS_LKG_MCP_TARGET")
+    rollback_target = Path(raw_target).expanduser() if raw_target else None
+    return observe_provisional(
+        passed=passed,
+        evidence={"source": "mcp"},
+        rollback_destination=rollback_target,
+    )
 
 
 @mcp.tool()
