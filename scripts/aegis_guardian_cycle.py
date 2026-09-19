@@ -105,7 +105,12 @@ def append_learning_card(event: dict[str, Any]) -> dict[str, Any]:
     return card
 
 
-def safe_repairs(repo: Path, scheduler_dir: Path) -> list[dict[str, Any]]:
+def safe_repairs(
+    repo: Path,
+    scheduler_dir: Path,
+    *,
+    allow_service_restart: bool,
+) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
     lock = scheduler_dir / "run.lock"
     if lock.is_dir():
@@ -117,7 +122,7 @@ def safe_repairs(repo: Path, scheduler_dir: Path) -> list[dict[str, Any]]:
             except OSError as exc:
                 actions.append({"action": "remove-stale-empty-scheduler-lock", "ok": False, "error": str(exc)})
 
-    if shutil_which("systemctl"):
+    if allow_service_restart and shutil_which("systemctl"):
         unit_known = run(["systemctl", "--user", "list-unit-files", SAFE_SERVICE], cwd=repo, timeout=30)
         if unit_known.returncode == 0 and SAFE_SERVICE in unit_known.stdout:
             reset = run(["systemctl", "--user", "reset-failed", SAFE_SERVICE], cwd=repo, timeout=30)
@@ -157,9 +162,14 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
 
     preflight = run(["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)], cwd=repo)
     repairs: list[dict[str, Any]] = []
-    if repair and (preflight.returncode != 0 or before_failures >= 3):
-        repairs = safe_repairs(repo, scheduler_dir)
-        preflight = run(["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)], cwd=repo)
+    if repair:
+        repairs = safe_repairs(
+            repo,
+            scheduler_dir,
+            allow_service_restart=before_failures >= 3,
+        )
+        if repairs:
+            preflight = run(["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)], cwd=repo)
 
     cycle_rc: int | None = None
     cycle_tail = ""
