@@ -138,7 +138,7 @@ def validate_network_url(url: str, label: str) -> None:
         ip = ipaddress.ip_address(parsed.hostname)
     except ValueError:
         host = parsed.hostname.lower()
-        if host not in {"fritz.box", "localhost"} and not host.endsWith(".local"):
+        if host not in {"fritz.box", "localhost"} and not host.endswith(".local"):
             raise ValueError(f"{label} hostname must be fritz.box, localhost, .local, or a private IP")
         return
     if not _is_private_ip(ip):
