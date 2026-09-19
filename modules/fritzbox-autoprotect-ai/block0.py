@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hmac
+import html
 import ipaddress
 import json
 import os
@@ -18,7 +19,6 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
-from xml.sax.saxutils import escape, quoteattr
 
 import requests
 from defusedxml import ElementTree as SafeET
@@ -43,6 +43,14 @@ REMOTE_BOOL_KEYS = {
 SENSITIVE_KEY_PARTS = ("password", "passwd", "secret", "token", "privatekey")
 XML_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,127}$")
 SERVICE_URN_RE = re.compile(r"^urn:[A-Za-z0-9_.-]+:service:[A-Za-z0-9_.-]+:[0-9]+$")
+def _xml_text(value: Any) -> str:
+    return html.escape(str(value), quote=False)
+
+
+def _xml_attr(value: Any) -> str:
+    return '"' + html.escape(str(value), quote=True) + '"'
+
+
 TASK_HINTS = {
     "code": ["coder", "code", "qwen", "deepseek", "starcoder", "codellama"],
     "reason": ["reason", "deepseek-r1", "qwen", "llama"],
@@ -521,11 +529,11 @@ class FritzBox:
             raise ValueError("invalid SOAP service/action name")
         if any(not XML_NAME_RE.fullmatch(str(key)) for key in arguments):
             raise ValueError("invalid SOAP argument name")
-        inner = "".join(f"<{key}>{escape(str(value))}</{key}>" for key, value in arguments.items())
+        inner = "".join(f"<{key}>{_xml_text(value)}</{key}>" for key, value in arguments.items())
         body = (
             '<?xml version="1.0" encoding="utf-8"?>'
-            f'<s:Envelope xmlns:s={quoteattr(SOAP_ENV)} s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
-            f'<s:Body><u:{action} xmlns:u={quoteattr(service.service_type)}>{inner}</u:{action}></s:Body></s:Envelope>'
+            f'<s:Envelope xmlns:s={_xml_attr(SOAP_ENV)} s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
+            f'<s:Body><u:{action} xmlns:u={_xml_attr(service.service_type)}>{inner}</u:{action}></s:Body></s:Envelope>'
         )
         root = self._request_xml(
             "POST",
