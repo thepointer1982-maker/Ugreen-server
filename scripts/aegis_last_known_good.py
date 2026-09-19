@@ -26,6 +26,10 @@ POINTER = ROOT / "last-known-good.json"
 HISTORY = ROOT / "history.jsonl"
 PROVISIONAL = ROOT / "provisional.json"
 PROBATION_HISTORY = ROOT / "probation-history.jsonl"
+ACTIVE = ROOT / "active.json"
+PREVIOUS_ACTIVE = ROOT / "previous-active.json"
+ACTIVE_HISTORY = ROOT / "active-history.jsonl"
+ACTIVE_BACKUPS = ROOT / "active-backups"
 DEFAULT_RESTORE_ROOTS = [
     Path.home() / ".local/state/aegis-ai-miner",
     Path.home() / ".local/state/aegis-guardian",
@@ -307,6 +311,271 @@ def current() -> dict[str, Any]:
     if expected != actual:
         return {"status": "broken", "reason": "pointer-artifact-hash-mismatch", "pointer": value}
     return {"status": "ok", "pointer": value, "artifact": artifact_value}
+
+
+
+def _backup_existing_active(destination: Path) -> dict[str, Any]:
+    if not destination.exists():
+        return {"status": "none"}
+
+    value, ok, reason = load_verified_json(destination)
+    if not ok:
+        return {
+            "status": "blocked",
+            "reason": f"existing-active-{reason}",
+            "destination": str(destination),
+        }
+
+    digest = value["_provenance"]["sha256"]
+    backup_dir = ACTIVE_BACKUPS / digest
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup = backup_dir / destination.name
+    if not backup.exists():
+        shutil.copy2(destination, backup)
+
+    copied, copied_ok, copied_reason = load_verified_json(backup)
+    if not copied_ok or copied["_provenance"]["sha256"] != digest:
+        return {
+            "status": "blocked",
+            "reason": f"active-backup-{copied_reason}",
+        }
+
+    pointer = attach_provenance(
+        {
+            "schema": "aegis-previous-active/v1",
+            "created_at": now_iso(),
+            "sha256": digest,
+            "artifact": str(backup),
+            "destination": str(destination),
+        },
+        kind="previous-active-pointer",
+        parent_sha256=digest,
+        parent_kind=value["_provenance"].get("kind"),
+    )
+    _atomic_json(PREVIOUS_ACTIVE, pointer)
+    return {
+        "status": "backed-up",
+        "sha256": digest,
+        "artifact": str(backup),
+    }
+
+
+def activate_current_lkg(
+    destination: Path,
+    *,
+    required_health_passes: int = 2,
+) -> dict[str, Any]:
+    if required_health_passes <= 0:
+        return {"status": "blocked", "reason": "invalid-activation-policy"}
+    if not _destination_allowed(destination):
+        return {
+            "status": "blocked",
+            "reason": "destination-outside-allowlist",
+            "destination": str(destination),
+        }
+
+    cur = current()
+    if cur.get("status") != "ok":
+        return {
+            "status": "blocked",
+            "reason": cur.get("reason", "no-valid-lkg"),
+        }
+
+    pointer = cur["pointer"]
+    source = Path(pointer["artifact"])
+    backup = _backup_existing_active(destination)
+    if backup.get("status") == "blocked":
+        return backup
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    tmp = destination.with_suffix(destination.suffix + ".activate.tmp")
+    shutil.copy2(source, tmp)
+    copied, ok, reason = load_verified_json(tmp)
+    if not ok or copied.get("_provenance", {}).get("sha256") != pointer["sha256"]:
+        tmp.unlink(missing_ok=True)
+        return {
+            "status": "blocked",
+            "reason": f"activation-verification-{reason}",
+        }
+    tmp.replace(destination)
+
+    active = attach_provenance(
+        {
+            "schema": "aegis-active-state/v1",
+            "activated_at": now_iso(),
+            "state": "validating",
+            "sha256": pointer["sha256"],
+            "destination": str(destination),
+            "previous_sha256": backup.get("sha256"),
+            "required_health_passes": required_health_passes,
+            "health_passes": 0,
+            "health_failures": 0,
+        },
+        kind="active-state",
+        parent_sha256=pointer["sha256"],
+        parent_kind=pointer.get("kind"),
+    )
+    _atomic_json(ACTIVE, active)
+    ROOT.mkdir(parents=True, exist_ok=True)
+    with ACTIVE_HISTORY.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({
+            "event": "activate",
+            "at": active["activated_at"],
+            "sha256": pointer["sha256"],
+            "destination": str(destination),
+            "previous_sha256": backup.get("sha256"),
+        }, sort_keys=True) + "\n")
+    return {
+        "status": "activated-validating",
+        "active": active,
+        "backup": backup,
+    }
+
+
+def active_status() -> dict[str, Any]:
+    value, ok, reason = load_verified_json(ACTIVE)
+    if not ok:
+        return {"status": "missing-or-invalid", "reason": reason}
+    destination = Path(value.get("destination", ""))
+    artifact, artifact_ok, artifact_reason = load_verified_json(destination)
+    if not artifact_ok:
+        return {
+            "status": "broken",
+            "reason": f"active-artifact-{artifact_reason}",
+            "active": value,
+        }
+    if artifact.get("_provenance", {}).get("sha256") != value.get("sha256"):
+        return {
+            "status": "broken",
+            "reason": "active-artifact-hash-mismatch",
+            "active": value,
+        }
+    return {"status": "ok", "active": value, "artifact": artifact}
+
+
+def rollback_previous_active() -> dict[str, Any]:
+    previous, ok, reason = load_verified_json(PREVIOUS_ACTIVE)
+    if not ok:
+        return {"status": "blocked", "reason": f"previous-active-{reason}"}
+
+    source = Path(previous.get("artifact", ""))
+    destination = Path(previous.get("destination", ""))
+    if not _destination_allowed(destination):
+        return {
+            "status": "blocked",
+            "reason": "previous-active-destination-outside-allowlist",
+        }
+
+    value, source_ok, source_reason = load_verified_json(source)
+    if not source_ok:
+        return {
+            "status": "blocked",
+            "reason": f"previous-active-artifact-{source_reason}",
+        }
+    expected = previous.get("sha256")
+    if value.get("_provenance", {}).get("sha256") != expected:
+        return {
+            "status": "blocked",
+            "reason": "previous-active-hash-mismatch",
+        }
+
+    tmp = destination.with_suffix(destination.suffix + ".rollback-active.tmp")
+    shutil.copy2(source, tmp)
+    copied, copied_ok, copied_reason = load_verified_json(tmp)
+    if not copied_ok or copied.get("_provenance", {}).get("sha256") != expected:
+        tmp.unlink(missing_ok=True)
+        return {
+            "status": "blocked",
+            "reason": f"active-rollback-verification-{copied_reason}",
+        }
+    tmp.replace(destination)
+
+    rolled = attach_provenance(
+        {
+            "schema": "aegis-active-state/v1",
+            "activated_at": now_iso(),
+            "state": "rolled-back",
+            "sha256": expected,
+            "destination": str(destination),
+            "previous_sha256": None,
+            "required_health_passes": 0,
+            "health_passes": 0,
+            "health_failures": 0,
+        },
+        kind="active-state",
+        parent_sha256=expected,
+        parent_kind=value["_provenance"].get("kind"),
+    )
+    _atomic_json(ACTIVE, rolled)
+    with ACTIVE_HISTORY.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({
+            "event": "rollback_previous_active",
+            "at": rolled["activated_at"],
+            "sha256": expected,
+            "destination": str(destination),
+        }, sort_keys=True) + "\n")
+    return {
+        "status": "rolled-back",
+        "sha256": expected,
+        "destination": str(destination),
+    }
+
+
+def observe_active_health(*, passed: bool, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    state = active_status()
+    if state.get("status") != "ok":
+        return {"status": "blocked", "reason": state.get("reason", "no-valid-active")}
+
+    active = dict(state["active"])
+    if active.get("state") not in {"validating", "stable"}:
+        return {"status": str(active.get("state") or "unknown")}
+
+    passes = int(active.get("health_passes", 0))
+    failures = int(active.get("health_failures", 0))
+    if passed:
+        passes += 1
+    else:
+        failures += 1
+
+    with ACTIVE_HISTORY.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({
+            "event": "active_health",
+            "at": now_iso(),
+            "sha256": active.get("sha256"),
+            "passed": bool(passed),
+            "passes": passes,
+            "failures": failures,
+            "evidence": evidence or {},
+        }, ensure_ascii=False, sort_keys=True) + "\n")
+
+    if not passed and active.get("state") == "validating":
+        rollback = rollback_previous_active()
+        return {
+            "status": "regression",
+            "passes": passes,
+            "failures": failures,
+            "rollback": rollback,
+        }
+
+    required = int(active.get("required_health_passes", 2))
+    if passes >= required:
+        active["state"] = "stable"
+    active["health_passes"] = passes
+    active["health_failures"] = failures
+    active = attach_provenance(
+        {k: v for k, v in active.items() if k != "_provenance"},
+        kind="active-state",
+        parent_sha256=active["sha256"],
+        parent_kind="activated-artifact",
+    )
+    _atomic_json(ACTIVE, active)
+    return {
+        "status": str(active["state"]),
+        "passes": passes,
+        "failures": failures,
+        "required_health_passes": required,
+    }
+
 
 
 def _allowed_restore_roots() -> list[Path]:
