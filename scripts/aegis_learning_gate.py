@@ -5,7 +5,12 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 from typing import Any
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_provenance import attach_provenance, verify_provenance
 
