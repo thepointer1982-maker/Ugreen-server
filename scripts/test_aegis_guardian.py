@@ -23,6 +23,27 @@ def main() -> None:
     assert mod.parse_nonnegative_int("4", 0) == 4
     assert mod.parse_nonnegative_int("broken", 7) == 7
     assert mod.parse_nonnegative_int("-2", 3) == 3
+    assert mod.probation_passes({
+        "mode": "healthy",
+        "evidence": {
+            "evidence_verified": True,
+            "local_ai_provenance_verified": True,
+        },
+    }) is True
+    assert mod.probation_passes({
+        "mode": "degraded",
+        "evidence": {
+            "evidence_verified": True,
+            "local_ai_provenance_verified": True,
+        },
+    }) is False
+    assert mod.probation_passes({
+        "mode": "healthy",
+        "evidence": {
+            "evidence_verified": False,
+            "local_ai_provenance_verified": True,
+        },
+    }) is False
 
     with tempfile.TemporaryDirectory() as raw:
         state = Path(raw)
