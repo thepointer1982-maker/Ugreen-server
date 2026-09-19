@@ -60,11 +60,11 @@ Recommended permissions:
 sudo install -d -m 0700 -o aegis -g aegis /var/lib/aegis/autoprotect
 sudo install -d -m 0750 -o root -g aegis /etc/aegis
 sudo sh -c 'umask 077; head -c 32 /dev/urandom > /etc/aegis/autoprotect-audit.key'
-sudo chown root:aegis /etc/aegis/autoprotect-audit.key
-sudo chmod 0640 /etc/aegis/autoprotect-audit.key
+sudo chown aegis:aegis /etc/aegis/autoprotect-audit.key
+sudo chmod 0600 /etc/aegis/autoprotect-audit.key
 ```
 
-If the service account must read the key directly, keep access limited to root + the dedicated `aegis` group. The application refuses a group/world-accessible key file, so deployments can alternatively copy it as an `aegis`-owned 0600 file.
+The application deliberately rejects a group/world-accessible audit key. The production key is therefore owned by the dedicated `aegis` service account with mode 0600.
 
 ## First read-only cycle
 
