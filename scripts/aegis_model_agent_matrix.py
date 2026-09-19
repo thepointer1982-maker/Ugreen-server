@@ -255,6 +255,8 @@ def main() -> int:
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
 
+    if args.min_samples <= 0:
+        raise SystemExit("--min-samples must be > 0")
     if args.max_age_hours <= 0:
         raise SystemExit("--max-age-hours must be > 0")
     cutoff = time.time() - args.max_age_hours * 3600.0
