@@ -13,6 +13,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_provenance import attach_provenance, verify_provenance
+from aegis_last_known_good import promote
 
 @dataclass
 class GateResult:
@@ -78,6 +79,7 @@ def main() -> int:
     p.add_argument("--regression-key", action="append", default=[])
     p.add_argument("--max-regression", type=float, default=0.0)
     p.add_argument("--output", type=Path)
+    p.add_argument("--promote-kind", help="Promote accepted candidate to last-known-good under this kind.")
     args = p.parse_args()
 
     baseline = load(args.baseline)
@@ -162,6 +164,30 @@ def main() -> int:
         tmp = args.output.with_suffix(args.output.suffix + ".tmp")
         tmp.write_text(text, encoding="utf-8")
         tmp.replace(args.output)
+
+    if result.accepted and args.promote_kind:
+        promotion = promote(
+            args.candidate,
+            kind=args.promote_kind,
+            metadata={
+                "baseline_sha256": baseline["_provenance"]["sha256"],
+                "candidate_sha256": candidate["_provenance"]["sha256"],
+                "learning_gate_sha256": payload["_provenance"]["sha256"],
+            },
+        )
+        payload["promotion"] = promotion
+        payload = attach_provenance(
+            payload,
+            kind="learning-gate",
+            parent_sha256=candidate["_provenance"]["sha256"],
+            parent_kind=str(candidate["_provenance"].get("kind") or "candidate"),
+        )
+        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            tmp = args.output.with_suffix(args.output.suffix + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(args.output)
+
     print(text, end="")
     return 0 if result.accepted else 3
 
