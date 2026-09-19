@@ -38,6 +38,12 @@ class AegisPipelineTests(unittest.TestCase):
             "aegis_source_detect.sh",
             "aegis_nas_run_once.sh",
             "aegis_nas_bootstrap.sh",
+            "aegis_real_cycle.py",
+            "aegis_local_ai_miner.py",
+            "aegis_model_agent_matrix.py",
+            "aegis_guardian_cycle.py",
+            "aegis_provenance.py",
+            "aegis_last_known_good.py",
         ):
             shutil.copy2(SCRIPTS / name, repo / "scripts" / name)
         subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
