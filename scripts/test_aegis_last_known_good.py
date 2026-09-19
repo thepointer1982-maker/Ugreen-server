@@ -67,7 +67,7 @@ def main() -> None:
         dest = allowed_root / "active.json"
         restored = mod.restore(dest)
         assert restored["status"] == "restored"
-        assert json.loads(dest.read_text())["_provenance"]["sha256"] == digest
+        assert json.loads(dest.read_text())["_provenance"]["sha256"] == new_digest
 
         candidate3 = root / "candidate3.json"
         candidate3.write_text(
