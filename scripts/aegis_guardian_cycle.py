@@ -46,7 +46,27 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def run(cmd: list[str], *, cwd: Path, timeout: int = 240) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+    try:
+        return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        return subprocess.CompletedProcess(
+            cmd,
+            124,
+            stdout,
+            (stderr + "\nAEGIS_GUARDIAN timeout").strip(),
+        )
+    except OSError as exc:
+        return subprocess.CompletedProcess(cmd, 126, "", f"AEGIS_GUARDIAN exec_error: {exc}")
+
+
+def parse_nonnegative_int(value: str | None, default: int = 0) -> int:
+    try:
+        parsed = int(value or default)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
 
 
 def fingerprint(event: dict[str, Any]) -> str:
@@ -133,7 +153,7 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     scheduler_dir = Path(os.environ.get("AEGIS_SCHEDULER_STATE_DIR", Path.home() / ".local/state/aegis-scheduler"))
     before = read_env(scheduler_dir / "state.env")
-    before_failures = int(before.get("failures", "0") or 0)
+    before_failures = parse_nonnegative_int(before.get("failures"), 0)
 
     preflight = run(["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)], cwd=repo)
     repairs: list[dict[str, Any]] = []
@@ -149,7 +169,7 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
         cycle_tail = (cycle.stdout + "\n" + cycle.stderr)[-4000:]
 
     after = read_env(scheduler_dir / "state.env")
-    failures = int(after.get("failures", str(before_failures)) or 0)
+    failures = parse_nonnegative_int(after.get("failures"), before_failures)
     mode, reason = classify(failures, preflight.returncode, cycle_rc)
 
     latest = read_json(repo / "scores/latest.json")
