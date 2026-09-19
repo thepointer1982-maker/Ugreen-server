@@ -266,7 +266,18 @@ def observe_provisional(
             parent_sha256=provisional["sha256"],
             parent_kind=provisional["kind"],
         )
-        _atomic_json(PROVISIONAL, provisional)
+        with HISTORY.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({
+                "event": "reject_provisional",
+                "at": now_iso(),
+                "sha256": provisional["sha256"],
+                "passes": passes,
+                "failures": failures,
+            }, sort_keys=True) + "\n")
+        try:
+            PROVISIONAL.unlink()
+        except FileNotFoundError:
+            pass
         return result
 
     if passes >= required_passes:
@@ -420,6 +431,16 @@ def activate_current_lkg(
                 "reason": "activation-already-validating",
                 "existing_sha256": existing_sha,
             }
+        if (
+            existing_state == "stable"
+            and existing_sha == cur["pointer"].get("sha256")
+            and existing_destination == str(destination)
+        ):
+            return {
+                "status": "stable",
+                "active": existing_active["active"],
+                "idempotent": True,
+            }
 
     pointer = cur["pointer"]
     source = Path(pointer["artifact"])
@@ -447,6 +468,7 @@ def activate_current_lkg(
             "sha256": pointer["sha256"],
             "destination": str(destination),
             "previous_sha256": backup.get("sha256"),
+            "had_previous_active": backup.get("status") == "backed-up",
             "required_health_passes": required_health_passes,
             "health_passes": 0,
             "health_failures": 0,
@@ -496,6 +518,52 @@ def active_status() -> dict[str, Any]:
 def rollback_previous_active() -> dict[str, Any]:
     previous, ok, reason = load_verified_json(PREVIOUS_ACTIVE)
     if not ok:
+        active_state, active_ok, _ = load_verified_json(ACTIVE)
+        if active_ok and active_state.get("had_previous_active") is False:
+            destination = Path(active_state.get("destination", ""))
+            if not _destination_allowed(destination):
+                return {
+                    "status": "blocked",
+                    "reason": "first-activation-destination-outside-allowlist",
+                }
+            current_value, current_ok, current_reason = load_verified_json(destination)
+            if not current_ok:
+                return {
+                    "status": "blocked",
+                    "reason": f"first-activation-artifact-{current_reason}",
+                }
+            if current_value.get("_provenance", {}).get("sha256") != active_state.get("sha256"):
+                return {
+                    "status": "blocked",
+                    "reason": "first-activation-artifact-hash-mismatch",
+                }
+            destination.unlink()
+            rolled = attach_provenance(
+                {
+                    "schema": "aegis-active-state/v1",
+                    "activated_at": now_iso(),
+                    "state": "rolled-back-empty",
+                    "sha256": None,
+                    "destination": str(destination),
+                    "previous_sha256": None,
+                    "had_previous_active": False,
+                    "required_health_passes": 0,
+                    "health_passes": 0,
+                    "health_failures": 1,
+                },
+                kind="active-state",
+            )
+            _atomic_json(ACTIVE, rolled)
+            with ACTIVE_HISTORY.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "event": "rollback_first_activation_to_empty",
+                    "at": rolled["activated_at"],
+                    "destination": str(destination),
+                }, sort_keys=True) + "\n")
+            return {
+                "status": "rolled-back-empty",
+                "destination": str(destination),
+            }
         return {"status": "blocked", "reason": f"previous-active-{reason}"}
 
     source = Path(previous.get("artifact", ""))
