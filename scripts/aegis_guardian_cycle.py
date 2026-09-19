@@ -18,7 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_provenance import verify_provenance
-from aegis_last_known_good import provisional_status, observe_provisional
+from aegis_last_known_good import active_status, observe_active_health, provisional_status, observe_provisional
 
 STATE_DIR = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", Path.home() / ".local/state/aegis-guardian"))
 STATUS_FILE = STATE_DIR / "status.json"
@@ -297,6 +297,27 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
             status["reason"] = "provisional-regression-rollback"
     else:
         status["probation"] = {"status": "none"}
+
+    active = active_status()
+    if active.get("status") == "ok":
+        active_state = active.get("active", {}).get("state")
+        if active_state == "validating":
+            status["activation"] = observe_active_health(
+                passed=probation_passes(status),
+                evidence={
+                    "guardian_mode": status.get("mode"),
+                    "guardian_reason": status.get("reason"),
+                    "evidence_verified": status["evidence"].get("evidence_verified"),
+                    "local_ai_provenance_verified": status["evidence"].get("local_ai_provenance_verified"),
+                },
+            )
+            if status["activation"].get("status") == "regression":
+                status["mode"] = "blocked"
+                status["reason"] = "active-regression-rollback"
+        else:
+            status["activation"] = {"status": active_state or "unknown"}
+    else:
+        status["activation"] = {"status": "none"}
 
     tmp = STATUS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(status, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
