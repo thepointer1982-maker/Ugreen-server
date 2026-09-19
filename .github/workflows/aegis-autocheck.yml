@@ -107,7 +107,7 @@ jobs:
           from mcp.server import MCPServer
           if not isinstance(mod.mcp, MCPServer):
               raise SystemExit('mcp object is not an MCPServer')
-          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'run_guardian_cycle'):
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'run_guardian_cycle'):
               if not callable(getattr(mod, name, None)):
                   raise SystemExit(f'MCP callable missing: {name}')
           import os
@@ -115,7 +115,11 @@ jobs:
           blocked = mod.restore_last_known_good()
           if blocked.get('status') != 'blocked' or blocked.get('reason') != 'mcp-rollback-target-not-configured':
               raise SystemExit(f'MCP rollback fail-closed contract broken: {blocked}')
-          print('AEGIS MCP v2 public import and rollback contract OK')
+          os.environ.pop('AEGIS_LKG_ACTIVATION_TARGET', None)
+          blocked_activation = mod.activate_last_known_good()
+          if blocked_activation.get('status') != 'blocked' or blocked_activation.get('reason') != 'activation-target-not-configured':
+              raise SystemExit(f'MCP activation fail-closed contract broken: {blocked_activation}')
+          print('AEGIS MCP v2 public import, rollback and activation contract OK')
           PY
 
       - name: Detect real score data
