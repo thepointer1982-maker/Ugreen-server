@@ -58,6 +58,26 @@ def main() -> None:
             max_failures=1,
         )
         assert staged["status"] == "provisional"
+        staged_same = mod.stage_provisional(
+            candidate2,
+            kind="model-routing",
+            required_passes=2,
+            max_failures=1,
+        )
+        assert staged_same["status"] == "provisional"
+        assert staged_same.get("idempotent") is True
+
+        candidate_parallel = root / "candidate-parallel.json"
+        candidate_parallel.write_text(
+            json.dumps(attach_provenance({"score": 0.97}, kind="eval-candidate")),
+            encoding="utf-8",
+        )
+        blocked_parallel = mod.stage_provisional(
+            candidate_parallel,
+            kind="model-routing",
+        )
+        assert blocked_parallel["status"] == "blocked"
+        assert blocked_parallel["reason"] == "provisional-already-in-progress"
         assert mod.current()["pointer"]["sha256"] == digest
         probation1 = mod.observe_provisional(passed=True, evidence={"run": 1})
         assert probation1["status"] == "probation"
@@ -91,7 +111,7 @@ def main() -> None:
             rollback_destination=dest,
         )
         assert rejected["status"] == "rejected"
-        assert rejected["rollback"]["status"] in {"restored", "already-current"}
+        assert rejected["rollback"]["status"] == "not-needed"
 
         active_target = allowed_root / "routing.json"
         first_active = mod.activate_current_lkg(active_target, required_health_passes=2)
@@ -110,6 +130,9 @@ def main() -> None:
         assert promoted4["status"] == "promoted"
         second_active = mod.activate_current_lkg(active_target, required_health_passes=2)
         assert second_active["status"] == "activated-validating"
+        second_active_same = mod.activate_current_lkg(active_target, required_health_passes=2)
+        assert second_active_same["status"] == "activated-validating"
+        assert second_active_same.get("idempotent") is True
         bad_health = mod.observe_active_health(
             passed=False,
             evidence={"run": "activation-regression"},
