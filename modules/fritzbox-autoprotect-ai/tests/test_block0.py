@@ -216,3 +216,64 @@ def test_public_summary_never_exposes_inventory_values():
         "controller.example",
     ):
         assert secret not in serialized
+
+
+def test_audit_refuses_append_when_existing_chain_cannot_be_verified():
+    with TemporaryDirectory() as raw:
+        path = Path(raw) / "audit.jsonl"
+        keyed = HashAudit(path, b"k" * 32)
+        keyed.append({"x": 1})
+        unkeyed = HashAudit(path)
+        with pytest.raises(RuntimeError):
+            unkeyed.append({"x": 2})
+
+
+def test_latest_binding_detects_snapshot_tamper(tmp_path):
+    from block0 import Engine, snapshot_digest
+    import json
+
+    cfg = Config(state_dir=str(tmp_path), audit_key_file=str(tmp_path / "missing.key"))
+    engine = Engine(cfg)
+    snapshot = {
+        "captured_at": "2026-01-01T00:00:00+00:00",
+        "reachable": True,
+        "services": [],
+        "device_info": {},
+        "hosts": [],
+        "hosts_scanned": True,
+        "mappings": [],
+        "mappings_scanned": True,
+        "remote_probes": {},
+        "remote_scan_complete": True,
+        "remote_services_seen": 0,
+        "usp_controllers": [],
+        "errors": [],
+    }
+    score = {"score": 80.0, "gate_passed": True, "critical_blockers": [], "checks": []}
+    record = {
+        "schema_version": 2,
+        "captured_at": snapshot["captured_at"],
+        "config_fingerprint": engine.fingerprint,
+        "snapshot": snapshot,
+        "score": score,
+        "audit_integrity": "sha256",
+        "mutation_allowed": False,
+        "mutation_reason": "apply_disabled",
+    }
+    engine.audit.append(
+        {
+            "schema_version": 2,
+            "captured_at": snapshot["captured_at"],
+            "config_fingerprint": engine.fingerprint,
+            "snapshot_digest": snapshot_digest(snapshot),
+            "score": score,
+            "audit_integrity": "sha256",
+            "mutation_allowed": False,
+            "mutation_reason": "apply_disabled",
+        }
+    )
+    secure_atomic_write(tmp_path / "latest.json", json.dumps(record))
+    assert engine.latest() is not None
+    record["snapshot"]["reachable"] = False
+    secure_atomic_write(tmp_path / "latest.json", json.dumps(record))
+    assert engine.latest() is None
