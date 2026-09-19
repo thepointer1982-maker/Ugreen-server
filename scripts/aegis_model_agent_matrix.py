@@ -130,14 +130,18 @@ def build_matrix(
         telemetry = [r for r in telemetry if r.get("timestamp") is None or float(r["timestamp"]) >= cutoff]
 
     groups: dict[tuple[str,str], dict[str,Any]] = defaultdict(lambda: {
-        "trace_count":0,"successes":0,"feedback_sum":0.0,"feedback_n":0,
-        "trace_latency_sum":0.0,"trace_tokens":0,
-        "telemetry_count":0,"telemetry_latency_sum":0.0,"throughput_sum":0.0,
-        "telemetry_tokens":0,"cost_sum":0.0,"energy_sum":0.0
+        "trace_count":0,"dated_trace_count":0,"successes":0,"feedback_sum":0.0,"feedback_n":0,
+        "trace_latency_sum":0.0,"trace_tokens":0,"latest_trace_ts":None,
+        "telemetry_count":0,"dated_telemetry_count":0,"telemetry_latency_sum":0.0,"throughput_sum":0.0,
+        "telemetry_tokens":0,"cost_sum":0.0,"energy_sum":0.0,"latest_telemetry_ts":None
     })
     for r in traces:
         g = groups[(r["agent"],r["model"])]
         g["trace_count"] += 1
+        if r.get("timestamp") is not None:
+            g["dated_trace_count"] += 1
+            ts = float(r["timestamp"])
+            g["latest_trace_ts"] = ts if g["latest_trace_ts"] is None else max(g["latest_trace_ts"], ts)
         g["successes"] += 1 if r["outcome"] == "success" else 0
         if r["feedback"] is not None:
             g["feedback_sum"] += float(r["feedback"])
@@ -148,6 +152,10 @@ def build_matrix(
     for r in telemetry:
         g = groups[(r["agent"],r["model"])]
         g["telemetry_count"] += 1
+        if r.get("timestamp") is not None:
+            g["dated_telemetry_count"] += 1
+            ts = float(r["timestamp"])
+            g["latest_telemetry_ts"] = ts if g["latest_telemetry_ts"] is None else max(g["latest_telemetry_ts"], ts)
         g["telemetry_latency_sum"] += r["latency"]
         g["throughput_sum"] += r["throughput"]
         g["telemetry_tokens"] += r["tokens"]
@@ -157,7 +165,9 @@ def build_matrix(
     rows = []
     for (agent,model), g in sorted(groups.items()):
         trace_n = g["trace_count"]
+        dated_trace_n = g["dated_trace_count"]
         tel_n = g["telemetry_count"]
+        dated_tel_n = g["dated_telemetry_count"]
         success_rate = g["successes"]/trace_n if trace_n else None
         avg_feedback = g["feedback_sum"]/g["feedback_n"] if g["feedback_n"] else None
         avg_latency = (
@@ -189,7 +199,11 @@ def build_matrix(
             "agent":agent,
             "model":model,
             "trace_count":trace_n,
+            "dated_trace_count":dated_trace_n,
             "telemetry_count":tel_n,
+            "dated_telemetry_count":dated_tel_n,
+            "latest_trace_timestamp":g["latest_trace_ts"],
+            "latest_telemetry_timestamp":g["latest_telemetry_ts"],
             "success_rate":success_rate,
             "avg_feedback":avg_feedback,
             "avg_latency_seconds":avg_latency,
@@ -203,7 +217,10 @@ def build_matrix(
             "efficiency_confidence":round(efficiency_confidence,4),
             "confidence":round(confidence,4),
             "composite_score":round(composite,4),
-            "eligible_for_routing": trace_n >= min_samples,
+            "eligible_for_routing": (
+                trace_n >= min_samples
+                and (max_age_seconds is None or dated_trace_n >= min_samples)
+            ),
         })
 
     eligible = [r for r in rows if r["eligible_for_routing"]]
