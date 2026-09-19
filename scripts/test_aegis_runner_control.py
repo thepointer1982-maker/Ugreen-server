@@ -11,6 +11,7 @@ def main():
     p = subprocess.run(["bash", str(SCRIPT), "--help"], text=True, capture_output=True)
     assert p.returncode == 0
     assert "token is never written" in p.stdout
+    assert "aegis-ugreen-v2" in p.stdout
 
     env = os.environ.copy()
     env.pop("AEGIS_RUNNER_TOKEN", None)
@@ -19,10 +20,14 @@ def main():
     assert "AEGIS_RUNNER_TOKEN missing" in p.stderr
 
     w = WORKFLOW.read_text(encoding="utf-8")
-    assert "runs-on: [self-hosted, linux, aegis-ugreen]" in w
+    assert "runs-on: [self-hosted, linux, aegis-ugreen-v2]" in w
     assert "github.actor == 'thepointer1982-maker'" in w
     assert "pull_request:" not in w
-    assert "deploy-retry" in w and "real-cycle" in w and "status" in w
+    assert 'allowed = {"status", "real-cycle", "deploy-retry"}' in w
+    assert "trusted_sha" in w
+    assert "merge-base --is-ancestor" in w
+    assert "git clean -fdx" in w
+    assert "AEGIS_REPO_PATH=$REPO" in w
     assert "curl " not in w
     print("AEGIS RUNNER CONTROL TESTS PASS")
 
