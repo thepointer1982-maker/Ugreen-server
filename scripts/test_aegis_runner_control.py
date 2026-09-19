@@ -26,7 +26,7 @@ def main():
     assert 'allowed = {"status", "real-cycle", "deploy-retry"}' in w
     assert "trusted_sha" in w
     assert "merge-base --is-ancestor" in w
-    assert "git clean -fdx" in w
+    assert 'git -C "$REPO" clean -fdx' in w
     assert "AEGIS_REPO_PATH=$REPO" in w
     assert "curl " not in w
     print("AEGIS RUNNER CONTROL TESTS PASS")
