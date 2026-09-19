@@ -24,6 +24,8 @@ ROOT = Path(os.environ.get(
 VERSIONS = ROOT / "versions"
 POINTER = ROOT / "last-known-good.json"
 HISTORY = ROOT / "history.jsonl"
+PROVISIONAL = ROOT / "provisional.json"
+PROBATION_HISTORY = ROOT / "probation-history.jsonl"
 DEFAULT_RESTORE_ROOTS = [
     Path.home() / ".local/state/aegis-ai-miner",
     Path.home() / ".local/state/aegis-guardian",
@@ -120,6 +122,176 @@ def promote(source: Path, *, kind: str, metadata: dict[str, Any] | None = None) 
         }, sort_keys=True) + "\n")
 
     return {"status": "promoted", "pointer": pointer}
+
+
+
+def stage_provisional(
+    source: Path,
+    *,
+    kind: str,
+    metadata: dict[str, Any] | None = None,
+    required_passes: int = 3,
+    max_failures: int = 1,
+) -> dict[str, Any]:
+    if required_passes <= 0 or max_failures < 0:
+        return {"status": "blocked", "reason": "invalid-probation-policy"}
+
+    snap = snapshot_artifact(source, kind=kind, metadata=metadata)
+    if snap.get("status") != "snapshotted":
+        return snap
+
+    previous = current()
+    previous_sha = (
+        previous.get("pointer", {}).get("sha256")
+        if previous.get("status") == "ok"
+        else None
+    )
+    provisional = attach_provenance(
+        {
+            "schema": "aegis-provisional/v1",
+            "created_at": now_iso(),
+            "kind": kind,
+            "sha256": snap["sha256"],
+            "artifact": snap["artifact"],
+            "metadata": metadata or {},
+            "previous_lkg_sha256": previous_sha,
+            "required_passes": required_passes,
+            "max_failures": max_failures,
+            "passes": 0,
+            "failures": 0,
+            "state": "provisional",
+        },
+        kind="provisional-pointer",
+        parent_sha256=snap["sha256"],
+        parent_kind=kind,
+    )
+    _atomic_json(PROVISIONAL, provisional)
+    ROOT.mkdir(parents=True, exist_ok=True)
+    with HISTORY.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({
+            "event": "stage_provisional",
+            "at": provisional["created_at"],
+            "kind": kind,
+            "sha256": snap["sha256"],
+            "previous_lkg_sha256": previous_sha,
+        }, sort_keys=True) + "\n")
+    return {"status": "provisional", "provisional": provisional}
+
+
+def provisional_status() -> dict[str, Any]:
+    value, ok, reason = load_verified_json(PROVISIONAL)
+    if not ok:
+        return {"status": "missing-or-invalid", "reason": reason}
+    artifact = Path(value.get("artifact", ""))
+    artifact_value, artifact_ok, artifact_reason = load_verified_json(artifact)
+    if not artifact_ok:
+        return {"status": "broken", "reason": artifact_reason, "provisional": value}
+    if artifact_value.get("_provenance", {}).get("sha256") != value.get("sha256"):
+        return {"status": "broken", "reason": "provisional-artifact-hash-mismatch", "provisional": value}
+    return {"status": "ok", "provisional": value, "artifact": artifact_value}
+
+
+def observe_provisional(
+    *,
+    passed: bool,
+    evidence: dict[str, Any] | None = None,
+    rollback_destination: Path | None = None,
+) -> dict[str, Any]:
+    state = provisional_status()
+    if state.get("status") != "ok":
+        return {"status": "blocked", "reason": state.get("reason", "no-valid-provisional")}
+
+    provisional = dict(state["provisional"])
+    passes = int(provisional.get("passes", 0))
+    failures = int(provisional.get("failures", 0))
+    if passed:
+        passes += 1
+    else:
+        failures += 1
+
+    event = {
+        "event": "probation_observation",
+        "at": now_iso(),
+        "sha256": provisional.get("sha256"),
+        "passed": bool(passed),
+        "passes": passes,
+        "failures": failures,
+        "evidence": evidence or {},
+    }
+    ROOT.mkdir(parents=True, exist_ok=True)
+    with PROBATION_HISTORY.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+
+    required_passes = int(provisional.get("required_passes", 3))
+    max_failures = int(provisional.get("max_failures", 1))
+
+    if failures > max_failures:
+        result: dict[str, Any] = {
+            "status": "rejected",
+            "reason": "probation-regression",
+            "passes": passes,
+            "failures": failures,
+        }
+        if rollback_destination is not None:
+            result["rollback"] = restore(rollback_destination)
+        provisional["state"] = "rejected"
+        provisional["passes"] = passes
+        provisional["failures"] = failures
+        provisional = attach_provenance(
+            {k: v for k, v in provisional.items() if k != "_provenance"},
+            kind="provisional-pointer",
+            parent_sha256=provisional["sha256"],
+            parent_kind=provisional["kind"],
+        )
+        _atomic_json(PROVISIONAL, provisional)
+        return result
+
+    if passes >= required_passes:
+        source = Path(provisional["artifact"])
+        promoted = promote(
+            source,
+            kind=str(provisional["kind"]),
+            metadata={
+                **(provisional.get("metadata") or {}),
+                "probation_passes": passes,
+                "probation_failures": failures,
+                "probation_confirmed_at": now_iso(),
+            },
+        )
+        if promoted.get("status") != "promoted":
+            return {
+                "status": "blocked",
+                "reason": "probation-promotion-failed",
+                "promotion": promoted,
+            }
+        try:
+            PROVISIONAL.unlink()
+        except FileNotFoundError:
+            pass
+        return {
+            "status": "confirmed",
+            "passes": passes,
+            "failures": failures,
+            "promotion": promoted,
+        }
+
+    provisional["passes"] = passes
+    provisional["failures"] = failures
+    provisional = attach_provenance(
+        {k: v for k, v in provisional.items() if k != "_provenance"},
+        kind="provisional-pointer",
+        parent_sha256=provisional["sha256"],
+        parent_kind=provisional["kind"],
+    )
+    _atomic_json(PROVISIONAL, provisional)
+    return {
+        "status": "probation",
+        "passes": passes,
+        "failures": failures,
+        "required_passes": required_passes,
+        "max_failures": max_failures,
+    }
+
 
 
 def current() -> dict[str, Any]:
