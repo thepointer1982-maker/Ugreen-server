@@ -11,8 +11,12 @@ on:
       - 'scripts/aegis_nas_run_once.sh'
       - 'scripts/aegis_scheduled_run.sh'
       - 'scripts/aegis_scheduler_install.sh'
+      - 'scripts/aegis_guardian_cycle.py'
+      - 'scripts/aegis_mcp_server.py'
       - 'scripts/test_aegis_pipeline.py'
       - 'scripts/test_aegis_scheduler.py'
+      - 'scripts/test_aegis_guardian.py'
+      - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   pull_request:
     paths:
@@ -23,8 +27,12 @@ on:
       - 'scripts/aegis_nas_run_once.sh'
       - 'scripts/aegis_scheduled_run.sh'
       - 'scripts/aegis_scheduler_install.sh'
+      - 'scripts/aegis_guardian_cycle.py'
+      - 'scripts/aegis_mcp_server.py'
       - 'scripts/test_aegis_pipeline.py'
       - 'scripts/test_aegis_scheduler.py'
+      - 'scripts/test_aegis_guardian.py'
+      - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
 
@@ -47,6 +55,31 @@ jobs:
 
       - name: Run AEGIS scheduler regression tests
         run: python3 scripts/test_aegis_scheduler.py
+
+      - name: Run AEGIS guardian regression tests
+        run: python3 scripts/test_aegis_guardian.py
+
+      - name: Compile guardian and MCP modules
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py
+
+      - name: Validate MCP v2 module
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check "mcp[cli]>=2,<3"
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path = Path('scripts/aegis_mcp_server.py')
+          spec = importlib.util.spec_from_file_location('aegis_mcp_server', path)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          names = {tool.name for tool in mod.mcp._tool_manager.list_tools()}
+          required = {'guardian_status', 'learning_cards', 'run_guardian_cycle'}
+          missing = required - names
+          if missing:
+              raise SystemExit(f'MCP tools missing: {sorted(missing)}')
+          print('AEGIS MCP v2 import/tool contract OK')
+          PY
 
       - name: Detect real score data
         id: detect
