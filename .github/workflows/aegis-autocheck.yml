@@ -48,6 +48,10 @@ on:
       - 'scripts/test_aegis_model_agent_matrix.py'
       - 'scripts/aegis_learning_gate.py'
       - 'scripts/test_aegis_learning_gate.py'
+      - 'scripts/aegis_provenance.py'
+      - 'scripts/test_aegis_provenance.py'
+      - 'scripts/aegis_last_known_good.py'
+      - 'scripts/test_aegis_last_known_good.py'
       - 'docs/aegis-guardian-mcp.md'
       - '.github/workflows/aegis-autocheck.yml'
   workflow_dispatch:
