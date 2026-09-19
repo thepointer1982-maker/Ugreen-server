@@ -4,15 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-fritzbox-autoprotect-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first AEGIS FRITZ!Box security observer, score gate and MCP server"
 requires-python = ">=3.11"
-dependencies = ["requests>=2.32,<3"]
+dependencies = [
+  "requests>=2.32,<3",
+  "defusedxml>=0.7.1,<1",
+]
 
 [project.optional-dependencies]
 mcp = ["mcp[cli]>=2,<3"]
-dev = ["pytest>=8,<10"]
+dev = [
+  "pytest>=8,<10",
+  "ruff>=0.14,<1",
+  "bandit>=1.8,<2",
+  "pip-audit>=2.10,<3",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = ["E501"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
