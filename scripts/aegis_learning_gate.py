@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from aegis_provenance import attach_provenance, verify_provenance
+
 @dataclass
 class GateResult:
     accepted: bool
@@ -73,9 +75,56 @@ def main() -> int:
     p.add_argument("--output", type=Path)
     args = p.parse_args()
 
+    baseline = load(args.baseline)
+    candidate = load(args.candidate)
+    baseline_ok, baseline_reason = verify_provenance(baseline)
+    candidate_ok, candidate_reason = verify_provenance(candidate)
+
+    if not baseline_ok or not candidate_ok:
+        payload = attach_provenance(
+            {
+                "schema": "aegis-learning-gate/v2",
+                "accepted": False,
+                "status": "blocked",
+                "reason": "provenance-verification-failed",
+                "improvement": None,
+                "regressions": [],
+                "evidence": {
+                    "baseline": {
+                        "verified": baseline_ok,
+                        "reason": baseline_reason,
+                        "sha256": baseline.get("_provenance", {}).get("sha256")
+                        if isinstance(baseline.get("_provenance"), dict) else None,
+                    },
+                    "candidate": {
+                        "verified": candidate_ok,
+                        "reason": candidate_reason,
+                        "sha256": candidate.get("_provenance", {}).get("sha256")
+                        if isinstance(candidate.get("_provenance"), dict) else None,
+                    },
+                },
+                "policy": {"fail_closed": True},
+            },
+            kind="learning-gate",
+        )
+        payload = attach_provenance(
+        payload,
+        kind="learning-gate",
+        parent_sha256=candidate["_provenance"]["sha256"],
+        parent_kind=str(candidate["_provenance"].get("kind") or "candidate"),
+    )
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            tmp = args.output.with_suffix(args.output.suffix + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(args.output)
+        print(text, end="")
+        return 3
+
     result = evaluate(
-        load(args.baseline),
-        load(args.candidate),
+        baseline,
+        candidate,
         score_key=args.score_key,
         min_improvement=args.min_improvement,
         score_scale=args.score_scale,
@@ -83,12 +132,16 @@ def main() -> int:
         max_regression=args.max_regression,
     )
     payload = {
-        "schema":"aegis-learning-gate/v1",
+        "schema":"aegis-learning-gate/v2",
         "accepted":result.accepted,
         "status":result.status,
         "reason":result.reason,
         "improvement":result.improvement,
         "regressions":result.regressions,
+        "evidence":{
+            "baseline_sha256": baseline["_provenance"]["sha256"],
+            "candidate_sha256": candidate["_provenance"]["sha256"],
+        },
         "policy":{
             "fail_closed":True,
             "min_improvement":args.min_improvement,
