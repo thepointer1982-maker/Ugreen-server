@@ -43,6 +43,14 @@ def main() -> None:
         assert cp.returncode == 124
         assert "timeout" in cp.stderr.lower()
 
+    with tempfile.TemporaryDirectory() as raw:
+        repo = Path(raw) / "repo"
+        scheduler = Path(raw) / "scheduler"
+        repo.mkdir()
+        scheduler.mkdir()
+        actions = mod.safe_repairs(repo, scheduler, allow_service_restart=False)
+        assert not any(a.get("action") == "restart-aegis-export-service" for a in actions)
+
     print("AEGIS GUARDIAN TESTS PASS")
 
 
