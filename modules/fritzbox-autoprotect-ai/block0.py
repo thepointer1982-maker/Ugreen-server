@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import html
 import hmac
+import html
 import ipaddress
 import json
 import os
