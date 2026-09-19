@@ -17,9 +17,13 @@ class SchedulerTests(unittest.TestCase):
         repo = td / "repo"
         scripts = repo / "scripts"
         scripts.mkdir(parents=True)
-        run_once = scripts / "aegis_nas_run_once.sh"
-        run_once.write_text(
-            "#!/usr/bin/env bash\necho fake-run >> \"${AEGIS_TEST_COUNTER}\"\nexit %d\n" % exit_code,
+        real_cycle = scripts / "aegis_real_cycle.py"
+        real_cycle.write_text(
+            "import os\n"
+            "from pathlib import Path\n"
+            "p = Path(os.environ['AEGIS_TEST_COUNTER'])\n"
+            "p.write_text((p.read_text() if p.exists() else '') + 'fake-run\\n')\n"
+            "raise SystemExit(%d)\n" % exit_code,
             encoding="utf-8",
         )
         return repo
