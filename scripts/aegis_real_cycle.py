@@ -266,8 +266,25 @@ def main() -> int:
 
     result = attach_provenance(result, kind="real-cycle")
     atomic_json(summary_file, result)
+
+    status_step = run_step(
+        [
+            sys.executable,
+            "scripts/aegis_real_status.py",
+            "--repo-root",
+            str(repo),
+        ],
+        repo,
+    )
+    result["steps"]["real_status"] = status_step
+    if status_step["rc"] not in (0, 2):
+        result["status"] = "blocked"
+        result["reason"] = "real-status-generation-failed"
+        result = attach_provenance(result, kind="real-cycle")
+        atomic_json(summary_file, result)
+
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    return 0 if result["status"] == "healthy" else (guardian["rc"] or 24)
+    return 0 if result["status"] == "healthy" else (guardian["rc"] or status_step["rc"] or 24)
 
 
 if __name__ == "__main__":
