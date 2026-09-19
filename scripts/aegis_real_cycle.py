@@ -15,7 +15,7 @@ REPO_DEFAULT = SCRIPT_DIR.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from aegis_provenance import attach_provenance
+from aegis_provenance import attach_provenance, verify_provenance
 
 
 def now_iso() -> str:
@@ -178,6 +178,24 @@ def main() -> int:
         return miner["rc"] or 22
 
     report = load_json(ai_report)
+    miner_ok, miner_reason = verify_provenance(report) if report else (False, "report-missing")
+    result["miner_provenance"] = {
+        "verified": miner_ok,
+        "reason": miner_reason,
+        "sha256": (
+            report.get("_provenance", {}).get("sha256")
+            if isinstance(report.get("_provenance"), dict)
+            else None
+        ),
+    }
+    if not miner_ok:
+        result["status"] = "blocked"
+        result["reason"] = "local-ai-miner-provenance-invalid"
+        result = attach_provenance(result, kind="real-cycle")
+        atomic_json(summary_file, result)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 25
+
     sources = select_database_sources(report)
     result["sources"] = sources
 
