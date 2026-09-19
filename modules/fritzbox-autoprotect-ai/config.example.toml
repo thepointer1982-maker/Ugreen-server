@@ -1,0 +1,36 @@
+[core]
+mode = "observe"
+apply_enabled = false
+min_apply_score = 90.0
+required_stable_cycles = 3
+loop_interval_seconds = 300
+state_dir = "/var/lib/aegis/autoprotect"
+
+[fritzbox]
+base_url = "http://fritz.box:49000"
+username = ""
+password_env = "AEGIS_FRITZ_PASSWORD"
+timeout_seconds = 8
+verify_tls = false
+max_hosts = 256
+max_port_mappings = 256
+
+[network]
+forbid_wan_management = true
+
+[models]
+policy = "local_first"
+ollama_url = "http://127.0.0.1:11434"
+allow_remote = false
+
+[gates]
+block_0 = 70.0
+block_1 = 80.0
+block_2 = 85.0
+block_3 = 90.0
+block_4 = 92.0
+block_5 = 94.0
+block_6 = 95.0
+block_7 = 96.0
+block_8 = 97.0
+block_9 = 98.0
