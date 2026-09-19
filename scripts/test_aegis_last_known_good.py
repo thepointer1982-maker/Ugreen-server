@@ -127,6 +127,7 @@ def main() -> None:
         )
         assert restaged["status"] == "provisional"
         assert mod.observe_provisional(passed=True)["status"] == "confirmed"
+        confirmed_digest = mod.current()["pointer"]["sha256"]
 
         first_fail_target = allowed_root / "first-fail.json"
         first_fail_activation = mod.activate_current_lkg(
@@ -169,7 +170,7 @@ def main() -> None:
         assert bad_health["status"] == "regression"
         assert bad_health["rollback"]["status"] == "rolled-back"
         rolled_value = json.loads(active_target.read_text())
-        assert rolled_value["_provenance"]["sha256"] == new_digest
+        assert rolled_value["_provenance"]["sha256"] == confirmed_digest
 
         outside = root / "outside" / "active.json"
         blocked_restore = mod.restore(outside)
