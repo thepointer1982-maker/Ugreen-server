@@ -47,6 +47,12 @@ It exposes:
 - tool `local_ai_inventory`
 - tool `model_agent_matrix`
 - tool `learning_gate_status`
+- tool `provisional_learning_status`
+- tool `record_probation_result`
+- tool `last_known_good_status`
+- tool `active_state_status`
+- tool `activate_last_known_good`
+- tool `restore_last_known_good`
 - tool `learning_cards`
 - tool `run_guardian_cycle(repair=false)`
 
@@ -65,6 +71,7 @@ Accepted learning candidates are not activated immediately.
 6. The previous active artifact is hash-verified and backed up first.
 7. The new active state enters `validating`.
 8. Guardian health cycles promote it to `stable` or roll back to the previous active artifact.
+9. If the first-ever activation regresses and no previous artifact exists, AEGIS verifies and removes only that newly activated artifact, returning safely to the prior empty state.
 
 Concurrent provisional candidates and concurrent validating activations are blocked. Re-submitting the same candidate/activation is idempotent.
 
