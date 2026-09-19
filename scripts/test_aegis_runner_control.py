@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+import os
 import subprocess
 from pathlib import Path
 
@@ -11,7 +12,9 @@ def main():
     assert p.returncode == 0
     assert "token is never written" in p.stdout
 
-    p = subprocess.run(["bash", str(SCRIPT)], text=True, capture_output=True, env={})
+    env = os.environ.copy()
+    env.pop("AEGIS_RUNNER_TOKEN", None)
+    p = subprocess.run(["bash", str(SCRIPT)], text=True, capture_output=True, env=env)
     assert p.returncode == 4
     assert "AEGIS_RUNNER_TOKEN missing" in p.stderr
 
