@@ -279,7 +279,7 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
 
     provisional = provisional_status()
     if provisional.get("status") == "ok":
-        raw_target = os.environ.get("AEGIS_LKG_MCP_TARGET")
+        raw_target = os.environ.get("AEGIS_LKG_ROLLBACK_TARGET")
         rollback_target = Path(raw_target).expanduser() if raw_target else None
         status["probation"] = observe_provisional(
             passed=probation_passes(status),
