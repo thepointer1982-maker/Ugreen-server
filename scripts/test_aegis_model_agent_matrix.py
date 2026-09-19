@@ -30,6 +30,15 @@ def main():
         assert len(data["rows"])==2
         assert data["best_by_agent"]["coder"]["model"] in {"m1","m2"}
         assert all("confidence" in r for r in data["rows"])
+
+        legacy=root/"legacy.db"
+        c=sqlite3.connect(legacy)
+        c.execute("CREATE TABLE telemetry (agent TEXT, model_id TEXT, latency_seconds REAL, throughput_tok_per_sec REAL, total_tokens INTEGER, cost_usd REAL, energy_joules REAL)")
+        c.execute("INSERT INTO telemetry VALUES (?,?,?,?,?,?,?)",("coder","legacy",1.0,5.0,10,0.0,1.0))
+        c.commit(); c.close()
+        legacy_rows=mod.telemetry_rows(legacy)
+        assert len(legacy_rows)==1
+        assert legacy_rows[0]["model"]=="legacy"
     print("AEGIS MODEL AGENT MATRIX TESTS PASS")
 
 if __name__=="__main__": main()
