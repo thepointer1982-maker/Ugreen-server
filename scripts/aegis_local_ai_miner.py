@@ -42,87 +42,167 @@ def safe_stat(path: Path) -> dict[str, Any]:
 
 
 def sqlite_summary(path: Path) -> dict[str, Any]:
-    result: dict[str, Any] = {"path": str(path), **safe_stat(path), "tables": {}, "error": None}
+    result: dict[str, Any] = {
+        "path": str(path),
+        **safe_stat(path),
+        "tables": {},
+        "error": None,
+        "section_errors": [],
+    }
+    conn: sqlite3.Connection | None = None
     try:
         uri = f"file:{path.resolve()}?mode=ro"
         conn = sqlite3.connect(uri, uri=True, timeout=2)
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-        )]
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        ]
+        table_columns: dict[str, set[str]] = {}
         for table in tables[:50]:
             if not table.replace("_", "").isalnum():
                 continue
             try:
                 count = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
-            except sqlite3.Error:
+                cols = {
+                    str(row[1])
+                    for row in conn.execute(f'PRAGMA table_info("{table}")')
+                }
+                table_columns[table] = cols
+            except sqlite3.Error as exc:
                 count = None
+                result["section_errors"].append(
+                    {"section": f"table:{table}", "error": str(exc)}
+                )
             result["tables"][table] = {"rows": count}
 
         if "traces" in tables:
-            row = conn.execute(
-                "SELECT COUNT(*), SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END), "
-                "AVG(feedback), AVG(total_latency_seconds), SUM(total_tokens) FROM traces"
-            ).fetchone()
-            result["trace_metrics"] = {
-                "count": row[0] or 0,
-                "successes": row[1] or 0,
-                "avg_feedback": row[2],
-                "avg_latency_seconds": row[3],
-                "total_tokens": row[4] or 0,
+            required = {
+                "outcome", "feedback", "total_latency_seconds",
+                "total_tokens", "model",
             }
-            models = conn.execute(
-                "SELECT model, COUNT(*) n, AVG(feedback), AVG(total_latency_seconds) "
-                "FROM traces GROUP BY model ORDER BY n DESC LIMIT 20"
-            ).fetchall()
-            result["trace_models"] = [
-                {"model": r[0], "count": r[1], "avg_feedback": r[2], "avg_latency_seconds": r[3]}
-                for r in models
-            ]
+            if required.issubset(table_columns.get("traces", set())):
+                try:
+                    row = conn.execute(
+                        "SELECT COUNT(*), "
+                        "SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END), "
+                        "AVG(feedback), AVG(total_latency_seconds), "
+                        "SUM(total_tokens) FROM traces"
+                    ).fetchone()
+                    result["trace_metrics"] = {
+                        "count": row[0] or 0,
+                        "successes": row[1] or 0,
+                        "avg_feedback": row[2],
+                        "avg_latency_seconds": row[3],
+                        "total_tokens": row[4] or 0,
+                    }
+                    models = conn.execute(
+                        "SELECT model, COUNT(*) n, AVG(feedback), "
+                        "AVG(total_latency_seconds) FROM traces "
+                        "GROUP BY model ORDER BY n DESC LIMIT 20"
+                    ).fetchall()
+                    result["trace_models"] = [
+                        {
+                            "model": r[0],
+                            "count": r[1],
+                            "avg_feedback": r[2],
+                            "avg_latency_seconds": r[3],
+                        }
+                        for r in models
+                    ]
+                except sqlite3.Error as exc:
+                    result["section_errors"].append(
+                        {"section": "traces", "error": str(exc)}
+                    )
+            else:
+                result["section_errors"].append(
+                    {"section": "traces", "error": "required columns missing"}
+                )
 
         if "telemetry" in tables:
-            row = conn.execute(
-                "SELECT COUNT(*), SUM(total_tokens), AVG(latency_seconds), AVG(throughput_tok_per_sec), "
-                "SUM(cost_usd), AVG(energy_joules), AVG(power_watts) FROM telemetry"
-            ).fetchone()
-            result["telemetry_metrics"] = {
-                "count": row[0] or 0,
-                "total_tokens": row[1] or 0,
-                "avg_latency_seconds": row[2],
-                "avg_throughput_tok_s": row[3],
-                "cost_usd": row[4] or 0,
-                "avg_energy_joules": row[5],
-                "avg_power_watts": row[6],
+            required = {
+                "total_tokens", "latency_seconds", "throughput_tok_per_sec",
+                "cost_usd", "energy_joules", "power_watts", "model_id",
             }
-            models = conn.execute(
-                "SELECT model_id, COUNT(*) n, AVG(latency_seconds), AVG(throughput_tok_per_sec), SUM(total_tokens) "
-                "FROM telemetry GROUP BY model_id ORDER BY n DESC LIMIT 20"
-            ).fetchall()
-            result["telemetry_models"] = [
-                {"model": r[0], "count": r[1], "avg_latency_seconds": r[2],
-                 "avg_throughput_tok_s": r[3], "total_tokens": r[4] or 0}
-                for r in models
-            ]
+            if required.issubset(table_columns.get("telemetry", set())):
+                try:
+                    row = conn.execute(
+                        "SELECT COUNT(*), SUM(total_tokens), "
+                        "AVG(latency_seconds), AVG(throughput_tok_per_sec), "
+                        "SUM(cost_usd), AVG(energy_joules), AVG(power_watts) "
+                        "FROM telemetry"
+                    ).fetchone()
+                    result["telemetry_metrics"] = {
+                        "count": row[0] or 0,
+                        "total_tokens": row[1] or 0,
+                        "avg_latency_seconds": row[2],
+                        "avg_throughput_tok_s": row[3],
+                        "cost_usd": row[4] or 0,
+                        "avg_energy_joules": row[5],
+                        "avg_power_watts": row[6],
+                    }
+                    models = conn.execute(
+                        "SELECT model_id, COUNT(*) n, AVG(latency_seconds), "
+                        "AVG(throughput_tok_per_sec), SUM(total_tokens) "
+                        "FROM telemetry GROUP BY model_id "
+                        "ORDER BY n DESC LIMIT 20"
+                    ).fetchall()
+                    result["telemetry_models"] = [
+                        {
+                            "model": r[0],
+                            "count": r[1],
+                            "avg_latency_seconds": r[2],
+                            "avg_throughput_tok_s": r[3],
+                            "total_tokens": r[4] or 0,
+                        }
+                        for r in models
+                    ]
+                except sqlite3.Error as exc:
+                    result["section_errors"].append(
+                        {"section": "telemetry", "error": str(exc)}
+                    )
+            else:
+                result["section_errors"].append(
+                    {"section": "telemetry", "error": "required columns missing"}
+                )
 
         if "entities" in tables and "relations" in tables:
-            result["knowledge_graph"] = {
-                "entities": conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0],
-                "relations": conn.execute("SELECT COUNT(*) FROM relations").fetchone()[0],
-                "entity_types": [
-                    {"type": r[0], "count": r[1]}
-                    for r in conn.execute(
-                        "SELECT entity_type, COUNT(*) FROM entities GROUP BY entity_type ORDER BY COUNT(*) DESC LIMIT 30"
-                    )
-                ],
-                "relation_types": [
-                    {"type": r[0], "count": r[1]}
-                    for r in conn.execute(
-                        "SELECT relation_type, COUNT(*) FROM relations GROUP BY relation_type ORDER BY COUNT(*) DESC LIMIT 30"
-                    )
-                ],
-            }
-        conn.close()
+            try:
+                result["knowledge_graph"] = {
+                    "entities": conn.execute(
+                        "SELECT COUNT(*) FROM entities"
+                    ).fetchone()[0],
+                    "relations": conn.execute(
+                        "SELECT COUNT(*) FROM relations"
+                    ).fetchone()[0],
+                    "entity_types": [
+                        {"type": r[0], "count": r[1]}
+                        for r in conn.execute(
+                            "SELECT entity_type, COUNT(*) FROM entities "
+                            "GROUP BY entity_type "
+                            "ORDER BY COUNT(*) DESC LIMIT 30"
+                        )
+                    ],
+                    "relation_types": [
+                        {"type": r[0], "count": r[1]}
+                        for r in conn.execute(
+                            "SELECT relation_type, COUNT(*) FROM relations "
+                            "GROUP BY relation_type "
+                            "ORDER BY COUNT(*) DESC LIMIT 30"
+                        )
+                    ],
+                }
+            except sqlite3.Error as exc:
+                result["section_errors"].append(
+                    {"section": "knowledge_graph", "error": str(exc)}
+                )
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        if conn is not None:
+            conn.close()
     return result
 
 
