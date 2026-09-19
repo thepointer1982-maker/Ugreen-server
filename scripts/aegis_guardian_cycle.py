@@ -319,6 +319,9 @@ def execute(repo: Path, repair: bool = False) -> dict[str, Any]:
     else:
         status["activation"] = {"status": "none"}
 
+    mode = str(status.get("mode") or mode)
+    reason = str(status.get("reason") or reason)
+
     tmp = STATUS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(status, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     tmp.replace(STATUS_FILE)
