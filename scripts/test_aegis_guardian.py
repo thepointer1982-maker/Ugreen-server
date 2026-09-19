@@ -29,6 +29,7 @@ def main() -> None:
         mod.STATE_DIR = state
         mod.CARDS_FILE = state / "learning-cards.jsonl"
         mod.INDEX_FILE = state / "learning-index.json"
+        mod.LEARNING_LOCK = state / "learning.lock"
         a = mod.append_learning_card({"mode":"degraded","reason":"x","action":"observe","outcome":"degraded","rc":2})
         b = mod.append_learning_card({"mode":"degraded","reason":"x","action":"observe","outcome":"degraded","rc":2})
         assert a["recurrence"] == 1
