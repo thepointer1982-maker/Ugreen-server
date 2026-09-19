@@ -40,10 +40,17 @@ def main() -> None:
         assert cur["status"] == "ok"
         digest = cur["pointer"]["sha256"]
 
-        dest = root / "active.json"
+        allowed_root = root / "allowed"
+        mod.DEFAULT_RESTORE_ROOTS = [allowed_root]
+        dest = allowed_root / "active.json"
         restored = mod.restore(dest)
         assert restored["status"] == "restored"
         assert json.loads(dest.read_text())["_provenance"]["sha256"] == digest
+
+        outside = root / "outside" / "active.json"
+        blocked_restore = mod.restore(outside)
+        assert blocked_restore["status"] == "blocked"
+        assert blocked_restore["reason"] == "destination-outside-allowlist"
 
         tampered = json.loads(src.read_text())
         tampered["score"] = 0.01
