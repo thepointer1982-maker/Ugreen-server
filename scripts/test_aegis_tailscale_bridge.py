@@ -16,7 +16,7 @@ def main():
     assert "NET_ADMIN" in text and "NET_RAW" in text
     assert "TS_AUTHKEY" not in text
     shell = SCRIPT.read_text(encoding="utf-8")
-    assert "tailscale serve" in shell
+    assert "ts serve" in shell
     assert "tcp://127.0.0.1:22" in shell
     assert "funnel" not in shell.lower() or "no public Funnel".lower() in shell.lower()
     print("AEGIS TAILSCALE BRIDGE TESTS PASS")
