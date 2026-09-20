@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 10,
-  "trusted_sha": "39320f29b9c0207b63711f689279492275b8b25f",
+  "sequence": 11,
+  "trusted_sha": "2dd91ab875f530986e6178c7ad4dc7219760279c",
   "requested_by": "repository-owner",
-  "purpose": "verify-native-iphone-shortcuts-live-control"
+  "purpose": "verify-clean-resume-coder-boot-and-physical-ugreen-status"
 }
