@@ -1,0 +1,59 @@
+{
+  "schema": "aegis-runtime-backup/v1",
+  "retention": 14,
+  "encryption": {
+    "cipher": "aes-256-cbc",
+    "kdf": "pbkdf2",
+    "pbkdf2_iterations": 200000,
+    "integrity": "hmac-sha256",
+    "key_storage": "separate-local-file"
+  },
+  "include": [
+    ".local/state/aegis-guardian",
+    ".local/state/aegis-ai-miner",
+    ".local/state/aegis-project",
+    ".local/state/aegis-autonomy",
+    ".local/state/aegis-docker-efficiency",
+    ".local/state/aegis-pull-control",
+    ".local/state/aegis-coder-boot",
+    ".local/state/aegis-mcp",
+    ".local/state/aegis-workers",
+    ".local/state/aegis-voice",
+    ".local/state/aegis-lifecycle",
+    ".local/state/aegis-runner",
+    ".config/systemd/user"
+  ],
+  "systemd_name_prefix": "aegis-",
+  "exclude_name_patterns": [
+    "*.key",
+    "*.pem",
+    "*.p12",
+    "*.pfx",
+    "*.kdbx",
+    ".env",
+    ".env.*",
+    "id_rsa",
+    "id_ed25519",
+    "authorized_keys",
+    "*.token",
+    "*secret*",
+    "*password*",
+    "*credential*"
+  ],
+  "exclude_path_fragments": [
+    ".cache/",
+    ".local/share/ollama/",
+    ".ollama/",
+    "docker/volumes/",
+    ".local/share/aegis-mcp/venv/"
+  ],
+  "policy": {
+    "include_models": false,
+    "include_docker_volumes": false,
+    "include_git_source": false,
+    "include_secrets": false,
+    "network_upload": false,
+    "restore_in_place": false,
+    "backup_target_must_not_be_inside_source_tree": true
+  }
+}
