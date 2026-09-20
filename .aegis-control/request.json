@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 11,
-  "trusted_sha": "2dd91ab875f530986e6178c7ad4dc7219760279c",
+  "sequence": 12,
+  "trusted_sha": "f9ac5badcb3f03203667633b4f18abe30591c79b",
   "requested_by": "repository-owner",
-  "purpose": "verify-clean-resume-coder-boot-and-physical-ugreen-status"
+  "purpose": "physical-ugreen-gate-clean-resume-coder-boot-real-status"
 }
