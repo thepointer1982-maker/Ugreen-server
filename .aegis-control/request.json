@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 7,
-  "trusted_sha": "bffd6c955dd23f433031a852d92ef2e4d34a5acf",
+  "sequence": 8,
+  "trusted_sha": "f6c8b83837efdf249fae63a8d0f43fe8ca262f74",
   "requested_by": "repository-owner",
-  "purpose": "verify-zero-cost-bootstrap-live-status"
+  "purpose": "verify-trusted-zero-cost-bootstrap-live-status"
 }
