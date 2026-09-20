@@ -80,6 +80,9 @@ def main() -> None:
         "PlanEchoIsolation",
         "ApplyEchoIsolation",
         "RestoreEcho",
+        "PlanEchoAudioIsolation",
+        "ApplyEchoAudioIsolation",
+        "RestoreEchoAudio",
         "PlanFingerprintIsolation",
         "ApplyFingerprintIsolation",
         "RestoreFingerprint",
@@ -90,9 +93,12 @@ def main() -> None:
     ]:
         assert action in repair
     assert "already-applied" in repair
+    assert "echo-audio-isolation.json" in repair
+    assert '@("AudioEndpoint","Media","Bluetooth")' in repair
     assert "already-disabled" in repair
     assert "ConfirmAlternativeSignIn" in repair
     assert "fingerprint-isolation.json" in repair
+    assert "Wi-Fi, biometric devices, and Codex were not touched" in repair
     assert "Disable-PnpDevice" in repair
     assert "Enable-PnpDevice" in repair
     assert "HiberbootEnabled" in repair
