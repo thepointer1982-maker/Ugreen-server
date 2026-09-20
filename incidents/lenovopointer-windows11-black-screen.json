@@ -1,0 +1,47 @@
+{
+  "schema": "aegis-incident/v1",
+  "id": "lenovopointer-windows11-black-screen",
+  "device": "lenovopointer",
+  "os": "Windows 11",
+  "status": "evidence-required",
+  "observed": {
+    "phase": "shortly-after-Windows-start-or-login",
+    "echo_studio_connection": "Bluetooth or Wi-Fi observed shortly before black screen",
+    "black_screen": true,
+    "causal_link_to_echo_studio": "not-proven"
+  },
+  "hypotheses": [
+    {
+      "id": "gpu-display-driver-tdr",
+      "priority": 1
+    },
+    {
+      "id": "dwm-explorer-shell-failure",
+      "priority": 2
+    },
+    {
+      "id": "display-output-topology-switch",
+      "priority": 3
+    },
+    {
+      "id": "bluetooth-wifi-combo-driver-conflict",
+      "priority": 4
+    },
+    {
+      "id": "fast-startup-hybrid-state",
+      "priority": 5
+    }
+  ],
+  "safety": {
+    "default": "collect-only",
+    "forbidden": [
+      "partition changes",
+      "formatting",
+      "bootloader or EFI edits",
+      "automatic BIOS changes",
+      "automatic display-driver uninstall"
+    ]
+  },
+  "cost": "free-built-in-Windows-tools-only",
+  "next_gate": "capture at least one failing-boot evidence set before persistent driver changes"
+}
