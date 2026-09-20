@@ -45,13 +45,6 @@ done
 mkdir -p "$RUNNER_DIR" "$RUNTIME_ROOT" "$UNIT_DIR" "$STATE_DIR"
 chmod 700 "$RUNNER_DIR" "$RUNTIME_ROOT" "$STATE_DIR"
 
-runtime_repo="$RUNTIME_ROOT/Ugreen-server"
-if [[ ! -d "$runtime_repo/.git" ]]; then
-  git clone --no-checkout "$RUNNER_URL.git" "$runtime_repo"
-else
-  git -C "$runtime_repo" remote set-url origin "$RUNNER_URL.git"
-fi
-
 arch="$(uname -m)"
 case "$arch" in
   x86_64|amd64) pkg_arch="x64" ;;
@@ -104,6 +97,13 @@ if [[ "$configured" -ne 1 ]]; then
   configured=1
 else
   echo "runner_config=reused"
+fi
+
+runtime_repo="$RUNTIME_ROOT/Ugreen-server"
+if [[ ! -d "$runtime_repo/.git" ]]; then
+  git clone --no-checkout "$RUNNER_URL.git" "$runtime_repo"
+else
+  git -C "$runtime_repo" remote set-url origin "$RUNNER_URL.git"
 fi
 
 service_mode="manual"
