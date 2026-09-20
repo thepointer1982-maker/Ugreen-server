@@ -56,6 +56,9 @@ def main() -> None:
     assert coverage["astra-explicit-route"] == "not-local-core"
     assert coverage["mac-worker-wol"] == "implemented-unconfigured"
     assert coverage["offline-source-escrow"] == "implemented"
+    assert coverage["encrypted-runtime-backup"] == "implemented"
+    assert by_id["runtime-backup"]["required"] is True
+    assert by_id["runtime-backup"]["class"] == "privacy-core"
     assert coverage["windows-worker"] == "not-in-clean-branch"
 
     original_command_version = mod.command_version
