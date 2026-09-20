@@ -155,6 +155,12 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-runner" / "status.json",
         )
     )
+    docker_efficiency_file = Path(
+        os.environ.get(
+            "AEGIS_DOCKER_EFFICIENCY_STATE_FILE",
+            home_state / "aegis-docker-efficiency" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -164,6 +170,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     codex_oss = read_json(codex_oss_file)
     mcp_runtime = read_json(mcp_runtime_file)
     runner_state = read_json(runner_state_file)
+    docker_efficiency = read_json(docker_efficiency_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -179,6 +186,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     timer = systemd_status("aegis-export.timer")
     coder_timer = systemd_status("aegis-coder-boot.timer")
     runner_service = systemd_status("aegis-github-runner.service")
+    docker_timer = systemd_status("aegis-docker-efficiency.timer")
 
     health = "healthy"
     blockers: list[str] = []
@@ -239,6 +247,19 @@ def build_status(repo: Path) -> dict[str, Any]:
             health = "degraded"
         blockers.append("runner-service-inactive")
 
+    if docker_efficiency:
+        docker_ok, docker_reason = verify_provenance(docker_efficiency)
+        if not docker_ok:
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("docker-efficiency-provenance-invalid")
+        elif docker_efficiency.get("health") != "healthy":
+            if health == "healthy":
+                health = "degraded"
+            blockers.append(
+                f"docker-efficiency-{docker_efficiency.get('health')}"
+            )
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -269,6 +290,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "service": service,
                 "timer": timer,
                 "coder_boot_timer": coder_timer,
+                "docker_efficiency_timer": docker_timer,
             },
             "control": {
                 "runner": {
@@ -286,6 +308,16 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "network_listener": mcp_runtime.get("network_listener"),
                     "public_port": mcp_runtime.get("public_port"),
                     "wrapper": mcp_runtime.get("wrapper"),
+                },
+                "docker": {
+                    "health": docker_efficiency.get("health"),
+                    "reason": docker_efficiency.get("reason"),
+                    "full_inspect_performed": docker_efficiency.get(
+                        "full_inspect_performed"
+                    ),
+                    "metrics": docker_efficiency.get("metrics"),
+                    "guardrails": docker_efficiency.get("guardrails"),
+                    "systemd_timer": docker_timer,
                 },
             },
             "ollama": {
@@ -331,6 +363,10 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "codex_oss": file_state(codex_oss_file),
                 "mcp_runtime": file_state(mcp_runtime_file),
                 "runner": file_state(runner_state_file),
+                "docker_efficiency": file_state(
+                    docker_efficiency_file,
+                    verify=True,
+                ),
             },
         },
         kind="real-status",
