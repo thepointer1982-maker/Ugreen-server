@@ -1,0 +1,207 @@
+{
+  "schema": "aegis-service-lifecycle/v1",
+  "reviewed_at": "2026-09-20",
+  "baseline_review_after_days": 60,
+  "stale_release_after_days": 365,
+  "policy": {
+    "auto_update_external_software": false,
+    "auto_remove_services": false,
+    "block_known_legacy_fallbacks": true,
+    "require_probation_before_replacement": true,
+    "local_runtime_audit_only": true
+  },
+  "services": [
+    {
+      "id": "pull-control",
+      "class": "core",
+      "kind": "systemd-user",
+      "unit": "aegis-pull-control.timer",
+      "required": true
+    },
+    {
+      "id": "autonomy",
+      "class": "core",
+      "kind": "systemd-user",
+      "unit": "aegis-autonomy.timer",
+      "required": true
+    },
+    {
+      "id": "docker-efficiency",
+      "class": "core",
+      "kind": "systemd-user",
+      "unit": "aegis-docker-efficiency.timer",
+      "required": true
+    },
+    {
+      "id": "coder-boot",
+      "class": "core",
+      "kind": "systemd-user",
+      "unit": "aegis-coder-boot.timer",
+      "required": true
+    },
+    {
+      "id": "real-cycle",
+      "class": "core",
+      "kind": "systemd-user",
+      "unit": "aegis-export.timer",
+      "required": true
+    },
+    {
+      "id": "github-runner",
+      "class": "fallback",
+      "kind": "binary",
+      "command": "runner-listener",
+      "required": false,
+      "known_current": "2.337.0",
+      "release_date": "2026-08-26"
+    },
+    {
+      "id": "ollama",
+      "class": "core-ai",
+      "kind": "command",
+      "command": "ollama",
+      "args": [
+        "--version"
+      ],
+      "required": true,
+      "known_current": "0.34.2",
+      "release_date": "2026-09-15"
+    },
+    {
+      "id": "codex",
+      "class": "core-ai",
+      "kind": "command",
+      "command": "codex",
+      "args": [
+        "--version"
+      ],
+      "required": true,
+      "feature_contract": [
+        "--oss",
+        "--local-provider"
+      ],
+      "known_current": "0.155.1",
+      "release_date": "2026-09-18"
+    },
+    {
+      "id": "mcp-python",
+      "class": "core-ai",
+      "kind": "python-package",
+      "package": "mcp",
+      "required": true,
+      "minimum_supported": "2.0.0",
+      "known_current": "2.2.0",
+      "release_date": "2026-09-07"
+    },
+    {
+      "id": "opencode",
+      "class": "fallback-ai",
+      "kind": "command",
+      "command": "opencode",
+      "args": [
+        "--version"
+      ],
+      "required": false,
+      "minimum_supported": "1.17.0",
+      "legacy_below": "1.0.0",
+      "upstream": "anomalyco/opencode",
+      "legacy_upstream": "opencode-ai/opencode",
+      "known_current": "1.18.31",
+      "release_date": "2026-09-14"
+    },
+    {
+      "id": "tailscale",
+      "class": "opt-in",
+      "kind": "docker-image",
+      "container": "aegis-tailscale",
+      "required": false,
+      "known_current": "1.102.4",
+      "release_date": "2026-09-10"
+    },
+    {
+      "id": "docker",
+      "class": "host",
+      "kind": "command",
+      "command": "docker",
+      "args": [
+        "--version"
+      ],
+      "required": true
+    },
+    {
+      "id": "voice-bridge",
+      "class": "optional-local",
+      "kind": "systemd-user",
+      "unit": "aegis-voice-bridge.service",
+      "required": false
+    }
+  ],
+  "integration_coverage": [
+    {
+      "id": "iphone-shortcuts",
+      "status": "implemented",
+      "evidence": [
+        "scripts/aegis_shortcuts_remote_launcher.sh",
+        "scripts/aegis_iphone_ashell_bootstrap.sh"
+      ]
+    },
+    {
+      "id": "alexa-voice-context",
+      "status": "local-bridge-ready",
+      "evidence": [
+        "scripts/aegis_project_context.py",
+        "scripts/aegis_voice_bridge.py",
+        "scripts/aegis_voice_bridge_install.sh"
+      ],
+      "note": "Local Unix-socket bridge is implemented. Alexa cloud transport remains optional/external and is not part of the production core."
+    },
+    {
+      "id": "opencode-local",
+      "status": "guarded-modern-conditional",
+      "evidence": [
+        "config/opencode/aegis-local.json",
+        "scripts/aegis_coder_router.sh",
+        "scripts/aegis_opencode_guard.py",
+        "scripts/aegis_opencode_install.sh"
+      ]
+    },
+    {
+      "id": "tailscale-maintenance",
+      "status": "opt-in",
+      "evidence": [
+        "scripts/aegis_tailscale_bridge.sh",
+        "deploy/tailscale/docker-compose.yml"
+      ]
+    },
+    {
+      "id": "deepseek-explicit-route",
+      "status": "implemented-conditional",
+      "evidence": [
+        "config/models/aegis-local-models.json",
+        "scripts/aegis_local_model_select.py",
+        "scripts/aegis_coder_router.sh"
+      ],
+      "note": "DeepSeek R1 8B is selected for reasoning/debug only when already installed locally; no automatic optional-model download."
+    },
+    {
+      "id": "astra-explicit-route",
+      "status": "not-local-core",
+      "evidence": [],
+      "note": "Not part of the zero-cost local default path."
+    },
+    {
+      "id": "mac-worker-wol",
+      "status": "implemented-unconfigured",
+      "evidence": [
+        "config/workers/aegis-workers.json",
+        "scripts/aegis_worker_control.py"
+      ],
+      "note": "Fail-closed until the real LAN MAC is measured and explicitly enabled."
+    },
+    {
+      "id": "windows-worker",
+      "status": "not-in-clean-branch",
+      "evidence": []
+    }
+  ]
+}

@@ -70,6 +70,13 @@ required_scripts=(
   scripts/aegis_export_collect.sh
   scripts/aegis_repo_autocheck.py
   scripts/aegis_nas_run_once.sh
+  scripts/aegis_real_cycle.py
+  scripts/aegis_real_status.py
+  scripts/aegis_local_ai_miner.py
+  scripts/aegis_model_agent_matrix.py
+  scripts/aegis_guardian_cycle.py
+  scripts/aegis_provenance.py
+  scripts/aegis_last_known_good.py
 )
 missing_scripts=()
 for p in "${required_scripts[@]}"; do
@@ -79,11 +86,47 @@ done
 source_status="unknown"
 source_root=""
 source_output=""
+source_cache_used=0
 if [[ -n "$bash_cmd" && -f "$REPO_ROOT/scripts/aegis_source_detect.sh" ]]; then
+  cached_source_root=""
+  if [[ -s "$REPORT" ]]; then
+    cached_source_root="$(python3 - "$REPORT" "$REPO_ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+report, repo = Path(sys.argv[1]), str(Path(sys.argv[2]).resolve())
+try:
+    d = json.loads(report.read_text(encoding="utf-8"))
+    source = d.get("source") if isinstance(d, dict) else None
+    if (
+        d.get("status") == "ready"
+        and d.get("repo_root") == repo
+        and isinstance(source, dict)
+        and isinstance(source.get("root"), str)
+        and source.get("root")
+    ):
+        print(source["root"])
+except Exception:
+    pass
+PY
+)"
+  fi
+
   set +e
-  source_output="$(cd "$REPO_ROOT" && bash scripts/aegis_source_detect.sh 2>&1)"
-  rc=$?
+  if [[ -n "$cached_source_root" ]]; then
+    source_output="$(cd "$REPO_ROOT" && AEGIS_SOURCE_ROOT="$cached_source_root" bash scripts/aegis_source_detect.sh 2>&1)"
+    rc=$?
+    if [[ $rc -eq 0 ]]; then
+      source_cache_used=1
+    elif [[ $rc -eq 4 ]]; then
+      source_output="$(cd "$REPO_ROOT" && env -u AEGIS_SOURCE_ROOT bash scripts/aegis_source_detect.sh 2>&1)"
+      rc=$?
+    fi
+  else
+    source_output="$(cd "$REPO_ROOT" && bash scripts/aegis_source_detect.sh 2>&1)"
+    rc=$?
+  fi
   set -e
+
   if [[ $rc -eq 0 ]]; then
     source_status="ready"
     source_root="$(printf '%s\n' "$source_output" | sed -n 's/^source_root=//p' | head -n1)"
@@ -110,14 +153,15 @@ case "$remote" in
   *thepointer1982-maker/Ugreen-server.git|*thepointer1982-maker/Ugreen-server) origin_expected=1 ;;
 esac
 
-python3 - "$REPORT" "$REPO_ROOT" "$repo_ok" "$branch" "$remote" "$origin_expected" "$python3_cmd" "$git_cmd" "$bash_cmd" "$sha_cmd" "$write_ok" "$source_status" "$source_root" "$source_output" "${missing_scripts[*]}" "$DO_PUSH" <<'PY'
+python3 - "$REPORT" "$REPO_ROOT" "$repo_ok" "$branch" "$remote" "$origin_expected" "$python3_cmd" "$git_cmd" "$bash_cmd" "$sha_cmd" "$write_ok" "$source_status" "$source_root" "$source_output" "$source_cache_used" "${missing_scripts[*]}" "$DO_PUSH" <<'PY'
 import json, sys
 from datetime import datetime, timezone
 from pathlib import Path
 (
     report, repo_root, repo_ok, branch, remote, origin_expected,
     python3_cmd, git_cmd, bash_cmd, sha_cmd, write_ok,
-    source_status, source_root, source_output, missing_scripts, do_push,
+    source_status, source_root, source_output, source_cache_used,
+    missing_scripts, do_push,
 ) = sys.argv[1:]
 blockers = []
 if repo_ok != '1': blockers.append('not_git_repository')
@@ -156,6 +200,7 @@ data = {
     'source': {
         'status': source_status,
         'root': source_root or None,
+        'cache_used': source_cache_used == '1',
         'raw': source_output[-4000:],
     },
     'blockers': blockers,

@@ -1,0 +1,61 @@
+{
+  "schema": "aegis-project-definition/v1",
+  "project_id": "aegis-core",
+  "title": "AEGIS Local-First Core",
+  "objective": "Build a local-first, zero-recurring-AI-cost home-network AI control plane on the UGREEN NAS that can continue projects across models, devices, text, and voice without losing project state.",
+  "hard_constraints": [
+    "Local-first production core.",
+    "No recurring paid AI/API-token dependency in the default production path.",
+    "Cloud model fallback disabled by default and only enabled explicitly.",
+    "No public-Internet exposure of AEGIS management services by default.",
+    "No arbitrary privileged shell from AI tools.",
+    "Physical-device claims require measured evidence.",
+    "Every autonomous improvement requires provenance, rollback, and last-known-good safety.",
+    "UGREEN NAS is the persistent 24/7 brain; workers are optional."
+  ],
+  "operating_loop": [
+    "measure baseline",
+    "identify evidence-backed gap",
+    "apply bounded change",
+    "validate",
+    "compare before/after",
+    "probation",
+    "promote last-known-good or rollback",
+    "record project handoff"
+  ],
+  "current_program_gate": "physical UGREEN validation of local Codex OSS + Ollama + MCP project continuity",
+  "default_next_action": "Run the pinned physical UGREEN gate, verify local coder and project-context MCP, then run a real Guardian/Real-Cycle before advancing.",
+  "style_contract": {
+    "language": "de-DE",
+    "tone": [
+      "precise",
+      "direct",
+      "technical",
+      "calm"
+    ],
+    "continuity_rules": [
+      "Continue the active project and pending action before introducing unrelated work.",
+      "Preserve established AEGIS names, gate terminology, and technical vocabulary.",
+      "Do not reset persona or re-introduce the project on a channel switch.",
+      "Voice responses may be shorter but must preserve decisions, constraints, and pending action.",
+      "If context is missing or unverifiable, state the context gap instead of inventing continuity.",
+      "Do not claim real hardware state without measured evidence."
+    ],
+    "voice": {
+      "default_channel": "alexa",
+      "concise": true,
+      "no_style_reset": true,
+      "preserve_project_names": true,
+      "preserve_pending_action": true
+    }
+  },
+  "continuity_policy": {
+    "source_of_truth": "UGREEN local state + Git commit/provenance",
+    "model_specific_memory_required": false,
+    "full_transcript_storage_required": false,
+    "store_structured_handoffs_only": true,
+    "handoff_required_after_material_work": true,
+    "mcp_transport": "local-stdio",
+    "arbitrary_shell_tool": false
+  }
+}

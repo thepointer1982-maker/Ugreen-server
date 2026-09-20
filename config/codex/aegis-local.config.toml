@@ -1,0 +1,10 @@
+# AEGIS Local Codex profile
+# Local inference only. No hosted web search and no shell network access.
+oss_provider = "ollama"
+web_search = "disabled"
+sandbox_mode = "workspace-write"
+approval_policy = "never"
+allow_login_shell = false
+
+[sandbox_workspace_write]
+network_access = false
