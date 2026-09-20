@@ -108,18 +108,33 @@ def main():
 
     with tempfile.TemporaryDirectory() as raw:
         p = Path(raw) / "state.json"
-        mod.atomic_write_json(
+        unsigned = {
+            "last_sequence": 7,
+            "seen_sequence": 7,
+            "control_head": head,
+            "status": "idle",
+        }
+        mod.atomic_write_json(p, unsigned)
+        rejected = mod.read_state(p)
+        assert rejected == {"last_sequence": 0}
+
+        signed = mod.write_state(
             p,
             {
-                "last_sequence": 7,
-                "seen_sequence": 7,
-                "control_head": head,
-                "status": "idle",
+                **unsigned,
+                "transport": "outbound-pull",
+                "runner_required": False,
             },
         )
         state = mod.read_state(p)
         assert state["last_sequence"] == 7
         assert state["control_head"] == head
+        assert state["transport"] == "outbound-pull"
+        assert state["runner_required"] is False
+        ok, reason = mod.verify_provenance(state)
+        assert ok, reason
+        assert state["_provenance"]["kind"] == "pull-control-state"
+        assert signed["_provenance"]["sha256"] == state["_provenance"]["sha256"]
 
     print("AEGIS PULL CONTROL TESTS PASS")
 
