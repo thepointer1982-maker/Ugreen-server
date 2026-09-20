@@ -27,6 +27,8 @@ def main():
     assert "aegis_docker_efficiency_install.sh" in text
     assert "aegis_autonomy_install.sh" in text
     assert "aegis_service_lifecycle_install.sh" in text
+    assert "aegis_offline_escrow_install.sh" in text
+    assert "offline_escrow=$ESCROW_STATUS" in text
     assert "aegis_opencode_install.sh" in text
     assert "aegis_worker_control.py status" in text
     assert "aegis_voice_bridge_install.sh" in text
