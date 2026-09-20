@@ -203,7 +203,7 @@ concurrency:
 
 jobs:
   autocheck:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.repository.private && 'aegis-ugreen-v2' || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -408,7 +408,7 @@ jobs:
   publish-generated:
     if: github.event_name == 'push'
     needs: autocheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.repository.private && 'aegis-ugreen-v2' || 'ubuntu-latest' }}
     permissions:
       contents: write
     steps:
