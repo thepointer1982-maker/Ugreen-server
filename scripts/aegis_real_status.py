@@ -143,6 +143,18 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-codex-oss" / "status.json",
         )
     )
+    mcp_runtime_file = Path(
+        os.environ.get(
+            "AEGIS_MCP_STATE_FILE",
+            home_state / "aegis-mcp" / "runtime.json",
+        )
+    )
+    runner_state_file = Path(
+        os.environ.get(
+            "AEGIS_RUNNER_STATE_FILE",
+            home_state / "aegis-runner" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -150,6 +162,8 @@ def build_status(repo: Path) -> dict[str, Any]:
     scheduler = {}
     coder_boot = read_json(coder_boot_file)
     codex_oss = read_json(codex_oss_file)
+    mcp_runtime = read_json(mcp_runtime_file)
+    runner_state = read_json(runner_state_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -163,6 +177,8 @@ def build_status(repo: Path) -> dict[str, Any]:
     ollama = ollama_status()
     service = systemd_status("aegis-export.service")
     timer = systemd_status("aegis-export.timer")
+    coder_timer = systemd_status("aegis-coder-boot.timer")
+    runner_service = systemd_status("aegis-github-runner.service")
 
     health = "healthy"
     blockers: list[str] = []
@@ -212,6 +228,17 @@ def build_status(repo: Path) -> dict[str, Any]:
                 health = "degraded"
             blockers.append("coder-backends-unavailable")
 
+    mcp_health = mcp_runtime.get("health") if mcp_runtime else None
+    runner_active = runner_state.get("service_active") if runner_state else None
+    if mcp_runtime and mcp_health != "healthy":
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("mcp-runtime-unhealthy")
+    if runner_state and runner_active is not True:
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("runner-service-inactive")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -241,6 +268,25 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "state": scheduler,
                 "service": service,
                 "timer": timer,
+                "coder_boot_timer": coder_timer,
+            },
+            "control": {
+                "runner": {
+                    "configured": runner_state.get("configured"),
+                    "service_mode": runner_state.get("service_mode"),
+                    "service_active": runner_state.get("service_active"),
+                    "runner_name": runner_state.get("runner_name"),
+                    "labels": runner_state.get("labels"),
+                    "systemd": runner_service,
+                },
+                "mcp": {
+                    "health": mcp_runtime.get("health"),
+                    "reason": mcp_runtime.get("reason"),
+                    "transport": mcp_runtime.get("transport"),
+                    "network_listener": mcp_runtime.get("network_listener"),
+                    "public_port": mcp_runtime.get("public_port"),
+                    "wrapper": mcp_runtime.get("wrapper"),
+                },
             },
             "ollama": {
                 "reachable": ollama.get("reachable"),
@@ -283,6 +329,8 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "scheduler_state": file_state(env_path),
                 "coder_boot": file_state(coder_boot_file),
                 "codex_oss": file_state(codex_oss_file),
+                "mcp_runtime": file_state(mcp_runtime_file),
+                "runner": file_state(runner_state_file),
             },
         },
         kind="real-status",
