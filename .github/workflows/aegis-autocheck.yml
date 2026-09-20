@@ -54,7 +54,7 @@ on:
       - 'scripts/aegis_scheduled_run.sh'
       - 'scripts/aegis_scheduler_install.sh'
       - 'scripts/aegis_guardian_cycle.py'
-- 'scripts/aegis_real_cycle.py'
+      - 'scripts/aegis_real_cycle.py'
       - 'scripts/test_aegis_real_cycle.py'
       - 'scripts/aegis_real_status.py'
       - 'scripts/test_aegis_real_status.py'
