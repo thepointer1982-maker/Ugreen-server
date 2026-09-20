@@ -3,6 +3,7 @@ set -euo pipefail
 
 DESCRIPTOR_URL="${AEGIS_CONTROL_DESCRIPTOR_URL:-https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/aegis-control/.aegis-control/bootstrap.json}"
 TMP_DIR="${TMPDIR:-/tmp}"
+DEST="${AEGIS_DEST:-$HOME/aegis/Ugreen-server}"
 TMP_JSON="$(mktemp "$TMP_DIR/aegis-shortcuts-json.XXXXXX")"
 TMP_SCRIPT="$(mktemp "$TMP_DIR/aegis-shortcuts-bootstrap.XXXXXX")"
 cleanup() { rm -f "$TMP_JSON" "$TMP_SCRIPT"; }
@@ -51,13 +52,38 @@ BOOTSTRAP_URL="$(printf "%s\n" "$VALIDATED" | sed -n '3p')"
 echo "AEGIS Shortcuts launcher trusted_sha=$SHA sequence=$SEQUENCE"
 curl -fsSL --connect-timeout 10 --max-time 30 "$BOOTSTRAP_URL" -o "$TMP_SCRIPT"
 
-AEGIS_TRUSTED_SHA="$SHA" bash "$TMP_SCRIPT"
+AEGIS_TRUSTED_SHA="$SHA" AEGIS_DEST="$DEST" bash "$TMP_SCRIPT"
 
-STATE="$HOME/.local/state/aegis-pull-control/state.json"
-echo "=== AEGIS SHORTCUTS RESULT ==="
-if [[ -s "$STATE" ]]; then
-  cat "$STATE"
+PULL_STATE="$HOME/.local/state/aegis-pull-control/state.json"
+CODER_STATE="$HOME/.local/state/aegis-coder-boot/status.json"
+REAL_STATUS="$HOME/.local/state/aegis-real-status/latest.json"
+
+echo "=== AEGIS PULL CONTROL ==="
+if [[ -s "$PULL_STATE" ]]; then
+  cat "$PULL_STATE"
 else
   echo '{"status":"unknown","error":"pull-control-state-missing"}'
-  exit 5
+fi
+
+echo "=== AEGIS CODER BOOT ==="
+printf 'coder_boot_timer='
+systemctl --user is-active aegis-coder-boot.timer 2>/dev/null || true
+if [[ -s "$CODER_STATE" ]]; then
+  cat "$CODER_STATE"
+else
+  echo '{"health":"unknown","reason":"coder-boot-state-missing"}'
+fi
+
+echo "=== AEGIS SIGNED REAL STATUS ==="
+if [[ -d "$DEST/.git" && -f "$DEST/scripts/aegis_real_status.py" ]]; then
+  set +e
+  python3 "$DEST/scripts/aegis_real_status.py" --repo-root "$DEST" --output "$REAL_STATUS" >/dev/null
+  real_rc=$?
+  set -e
+  echo "real_status_rc=$real_rc"
+fi
+if [[ -s "$REAL_STATUS" ]]; then
+  cat "$REAL_STATUS"
+else
+  echo '{"health":"unknown","blockers":["real-status-missing"]}'
 fi
