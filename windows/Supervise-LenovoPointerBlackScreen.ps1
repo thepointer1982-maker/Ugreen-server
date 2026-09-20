@@ -23,6 +23,9 @@ New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 $LockPath = Join-Path $StateDir "supervisor.lock"
 $StatePath = Join-Path $StateDir "state.json"
 $LogPath = Join-Path $StateDir "events.jsonl"
+$ProcessStartTime = (Get-Process -Id $PID).StartTime.ToString("o")
+$BootTime = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
+$BootTimeIso = $(if ($BootTime) { ([datetime]$BootTime).ToString("o") } else { $null })
 
 function Write-JsonLine {
   param([System.Collections.IDictionary]$Data)
@@ -80,22 +83,43 @@ function Invoke-Resolver {
   }
 }
 
-# Atomic single-instance lock. A stale lock is cleared only if its PID no longer exists.
-$lock = $null
+# Single-instance lock. We validate PID + process start time + boot time to avoid
+# mistaking a reused PID for the previous supervisor.
+$existingLock = $null
 if (Test-Path -LiteralPath $LockPath) {
-  try { $lock = Get-Content -LiteralPath $LockPath -Raw | ConvertFrom-Json } catch { $lock = $null }
-  if ($lock -and $lock.pid) {
-    $running = Get-Process -Id ([int]$lock.pid) -ErrorAction SilentlyContinue
-    if ($running) {
-      Write-JsonLine ([ordered]@{ status="blocked"; reason="supervisor-already-running"; pid=[int]$lock.pid })
+  try { $existingLock = Get-Content -LiteralPath $LockPath -Raw | ConvertFrom-Json } catch { $existingLock = $null }
+  if ($existingLock -and $existingLock.pid) {
+    $running = Get-Process -Id ([int]$existingLock.pid) -ErrorAction SilentlyContinue
+    $sameProcess = $false
+    if ($running -and $existingLock.process_start_time) {
+      try {
+        $sameProcess = ($running.StartTime.ToString("o") -eq [string]$existingLock.process_start_time)
+      } catch { $sameProcess = $false }
+    }
+    $sameBoot = $true
+    if ($existingLock.boot_time -and $BootTimeIso) {
+      $sameBoot = ([string]$existingLock.boot_time -eq $BootTimeIso)
+    }
+    if ($sameProcess -and $sameBoot) {
+      Write-JsonLine ([ordered]@{
+        status="blocked"
+        reason="supervisor-already-running"
+        pid=[int]$existingLock.pid
+        process_start_time=[string]$existingLock.process_start_time
+      })
       exit 0
     }
   }
   Remove-Item -LiteralPath $LockPath -Force -ErrorAction SilentlyContinue
 }
 
-[ordered]@{ pid=$PID; started_at=(Get-Date).ToString("o") } |
-  ConvertTo-Json | Set-Content -LiteralPath $LockPath -Encoding UTF8
+$lockPayload = [ordered]@{
+  pid=$PID
+  process_start_time=$ProcessStartTime
+  boot_time=$BootTimeIso
+  started_at=(Get-Date).ToString("o")
+}
+$lockPayload | ConvertTo-Json | Set-Content -LiteralPath $LockPath -Encoding UTF8
 
 try {
   if ($InitialDelaySeconds -gt 0) {
@@ -104,8 +128,11 @@ try {
 
   $state = Read-State
   if ($state -and $state.cooldown_until) {
-    $until = [datetime]$state.cooldown_until
-    if ($until -gt (Get-Date)) {
+    $until = $null
+    try { $until = [datetime]$state.cooldown_until } catch {
+      Write-JsonLine ([ordered]@{ status="warning"; reason="invalid-cooldown-state"; raw=[string]$state.cooldown_until })
+    }
+    if ($until -and $until -gt (Get-Date)) {
       Write-JsonLine ([ordered]@{ status="cooldown"; cooldown_until=$until.ToString("o"); reason=$state.reason })
       exit 0
     }
