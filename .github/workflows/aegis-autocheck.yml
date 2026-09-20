@@ -127,6 +127,12 @@ jobs:
       - name: Run AEGIS runner control regression tests
         run: python3 scripts/test_aegis_runner_control.py
 
+      - name: Run AEGIS access bootstrap regression tests
+        run: python3 scripts/test_aegis_access_bootstrap.py
+
+      - name: Run AEGIS GitHub bootstrap regression tests
+        run: python3 scripts/test_aegis_bootstrap_from_github.py
+
       - name: Run AEGIS real-status regression tests
         run: python3 scripts/test_aegis_real_status.py
 
