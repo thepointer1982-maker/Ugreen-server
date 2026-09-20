@@ -96,11 +96,11 @@ fi
 cat > "$WRAPPER" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-MODEL="${AEGIS_LOCAL_CODER_MODEL:-$MODEL}"
+MODEL="\${AEGIS_LOCAL_CODER_MODEL:-$MODEL}"
 unset OPENAI_API_KEY OPENAI_ORG_ID OPENAI_PROJECT_ID OPENAI_BASE_URL CODEX_API_KEY CODEX_ACCESS_TOKEN
 export CODEX_HOME="$OSS_HOME"
 export PATH="$BIN_DIR:\$PATH"
-if [[ "${1:-}" == "exec" ]]; then
+if [[ "\${1:-}" == "exec" ]]; then
   shift
   exec codex exec --oss --local-provider ollama --model "\$MODEL" --profile aegis-local --sandbox workspace-write --ask-for-approval never --ephemeral -c 'web_search="disabled"' "\$@"
 fi
