@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 16,
-  "trusted_sha": "e990a2ddbefee1a969dc35737c30d5351d81ab62",
+  "sequence": 17,
+  "trusted_sha": "6fe8a6d33f35162b6a19cf68e49f263d84f445f8",
   "requested_by": "repository-owner",
-  "purpose": "physical-ugreen-efficiency-gate-fast-control-source-cache-preflight-miner-mcp-codex"
+  "purpose": "physical-ugreen-docker-efficiency-all-containers-gate"
 }
