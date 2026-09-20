@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "bca7a1ff199bacb7b715b920bc9e9a9661e30c12",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 20,
+  "trusted_sha": "59c4dc7f053ba877a8b2bb361237bcede52787af",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/59c4dc7f053ba877a8b2bb361237bcede52787af/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/59c4dc7f053ba877a8b2bb361237bcede52787af/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/59c4dc7f053ba877a8b2bb361237bcede52787af/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 21,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "Sequence 20 makes outbound pull-control the primary NAS control plane. deploy-retry is backward-compatible with older pull-control, performs a SHA-pinned persistent zero-cost bootstrap, installs AUTO-MAX-LOCAL/MCP/Local Codex/Ollama/Docker guardians and scheduler, avoids recursive pull-control self-start, then validates signed real status. GitHub self-hosted runner is optional fallback."
+  "notes": "Sequence 21 adds the signed daily read-only Service Lifecycle Guardian. It inventories required/fallback/optional services, installed versions, stale baselines and integration gaps; blocks known legacy fallbacks such as pre-1.x OpenCode, but performs no automatic external software updates/removals. Current reviewed upstream baselines: runner 2.337.0, Tailscale 1.102.4, Ollama 0.34.2, Codex 0.155.1, MCP Python SDK 2.2.0, OpenCode 1.18.31."
 }
