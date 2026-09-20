@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "deploy-retry",
-  "sequence": 20,
-  "trusted_sha": "bca7a1ff199bacb7b715b920bc9e9a9661e30c12",
+  "sequence": 21,
+  "trusted_sha": "59c4dc7f053ba877a8b2bb361237bcede52787af",
   "requested_by": "repository-owner",
-  "purpose": "self-update-primary-pull-control-and-install-auto-max-local-stack"
+  "purpose": "install-service-lifecycle-guardian-and-audit-all-aegis-integrations"
 }
