@@ -28,6 +28,8 @@ on:
       - 'scripts/test_aegis_pull_control.py'
       - 'scripts/aegis_pull_control_install.sh'
       - 'scripts/aegis_pull_control.py'
+      - 'scripts/test_aegis_zero_cost_bootstrap.py'
+      - 'scripts/aegis_zero_cost_bootstrap.sh'
       - 'scripts/test_aegis_bootstrap_from_github.py'
       - 'scripts/aegis_bootstrap_from_github.sh'
       - '.github/workflows/aegis-nas-control.yml'
@@ -82,6 +84,8 @@ on:
       - 'scripts/test_aegis_pull_control.py'
       - 'scripts/aegis_pull_control_install.sh'
       - 'scripts/aegis_pull_control.py'
+      - 'scripts/test_aegis_zero_cost_bootstrap.py'
+      - 'scripts/aegis_zero_cost_bootstrap.sh'
       - 'scripts/test_aegis_bootstrap_from_github.py'
       - 'scripts/aegis_bootstrap_from_github.sh'
       - 'scripts/test_aegis_access_bootstrap.py'
@@ -148,6 +152,9 @@ jobs:
       - name: Run AEGIS pull-control regression tests
         run: python3 scripts/test_aegis_pull_control.py
 
+      - name: Run AEGIS zero-cost bootstrap regression tests
+        run: python3 scripts/test_aegis_zero_cost_bootstrap.py
+
       - name: Run AEGIS coder-router regression tests
         run: python3 scripts/test_aegis_coder_router.py
 
@@ -155,7 +162,7 @@ jobs:
         run: python3 scripts/test_aegis_real_status.py
 
       - name: Validate hardened shell syntax
-        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_coder_router.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
+        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_zero_cost_bootstrap.sh scripts/aegis_coder_router.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
 
       - name: Run AEGIS guardian regression tests
         run: python3 scripts/test_aegis_guardian.py
@@ -176,7 +183,7 @@ jobs:
         run: python3 scripts/test_aegis_learning_gate.py
 
       - name: Compile guardian, deploy, retry, runner, tunnel, access, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_coder_router.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_coder_router.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
