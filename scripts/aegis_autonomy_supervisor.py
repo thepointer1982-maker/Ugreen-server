@@ -51,6 +51,12 @@ PROJECT_CONTEXT = Path(
 )
 CODER_ROUTER = REPO_ROOT / "scripts" / "aegis_coder_router.sh"
 GUARDIAN = REPO_ROOT / "scripts" / "aegis_guardian_cycle.py"
+GUARDIAN_STATUS = Path(
+    os.environ.get(
+        "AEGIS_GUARDIAN_STATUS_FILE",
+        Path.home() / ".local/state/aegis-guardian/status.json",
+    )
+)
 
 MAX_TASK_LEN = 4000
 MAX_QUEUE_SCAN = 200
@@ -212,6 +218,22 @@ def ensure_user_units(
         actions.append(action)
         used += 1
     return actions, used
+
+
+def guardian_repair_due(max_age_seconds: int = 600) -> bool:
+    status = read_json(GUARDIAN_STATUS)
+    if not status:
+        return True
+    if status.get("mode") != "healthy":
+        return True
+    try:
+        generated = datetime.fromisoformat(
+            str(status.get("generated_at") or "").replace("Z", "+00:00")
+        )
+        age = (now() - generated).total_seconds()
+    except Exception:
+        return True
+    return not (0 <= age <= max_age_seconds)
 
 
 def run_guardian_repair() -> dict[str, Any]:
@@ -521,7 +543,7 @@ def run_cycle() -> dict[str, Any]:
     unit_actions, used = ensure_user_units(policy, max_actions)
     actions.extend(unit_actions)
 
-    if len(actions) < max_actions:
+    if len(actions) < max_actions and guardian_repair_due():
         guardian = run_guardian_repair()
         actions.append(guardian)
 
