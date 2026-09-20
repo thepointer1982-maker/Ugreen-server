@@ -3,7 +3,13 @@ set -euo pipefail
 
 REPO_URL="${AEGIS_REPO_URL:-https://github.com/thepointer1982-maker/Ugreen-server.git}"
 BRANCH="${AEGIS_BRANCH:-aegis/guardian-learning-mcp}"
+TRUSTED_SHA="${AEGIS_TRUSTED_SHA:-}"
 DEST="${AEGIS_DEST:-$HOME/aegis/Ugreen-server}"
+
+if [[ -z "$TRUSTED_SHA" || ! "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "AEGIS_TRUSTED_SHA must be a full 40-character lowercase commit SHA." >&2
+  exit 2
+fi
 
 for cmd in git python3 systemctl; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd missing" >&2; exit 3; }
@@ -13,17 +19,27 @@ mkdir -p "$(dirname "$DEST")"
 chmod 700 "$(dirname "$DEST")"
 
 if [[ ! -d "$DEST/.git" ]]; then
-  git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$DEST"
+  git clone --no-checkout "$REPO_URL" "$DEST"
 else
   git -C "$DEST" remote set-url origin "$REPO_URL"
-  git -C "$DEST" fetch --prune origin "$BRANCH"
-  git -C "$DEST" checkout -B "$BRANCH" "origin/$BRANCH"
-  git -C "$DEST" reset --hard "origin/$BRANCH"
-  git -C "$DEST" clean -fdx
 fi
+
+git -C "$DEST" fetch --prune origin "$BRANCH"
+git -C "$DEST" cat-file -e "$TRUSTED_SHA^{commit}"
+if ! git -C "$DEST" merge-base --is-ancestor "$TRUSTED_SHA" "origin/$BRANCH"; then
+  echo "blocked: trusted SHA is not an ancestor of origin/$BRANCH" >&2
+  exit 4
+fi
+git -C "$DEST" checkout --detach --force "$TRUSTED_SHA"
+git -C "$DEST" reset --hard "$TRUSTED_SHA"
+git -C "$DEST" clean -fdx
 
 cd "$DEST"
 HEAD_SHA="$(git rev-parse HEAD)"
+[[ "$HEAD_SHA" == "$TRUSTED_SHA" ]] || {
+  echo "blocked: checked out head does not match trusted SHA" >&2
+  exit 4
+}
 echo "repo=$DEST"
 echo "head=$HEAD_SHA"
 
