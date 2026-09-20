@@ -41,6 +41,7 @@ foreach ($name in $files) {
 
 $installer = Join-Path $Pkg "Install-LenovoPointerBlackScreenWatch.ps1"
 $collector = Join-Path $Pkg "Collect-LenovoPointerBlackScreen.ps1"
+$recovery = Join-Path $Pkg "Recover-LenovoPointerBlackScreen.ps1"
 
 $id = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($id)
@@ -64,6 +65,16 @@ if ($isAdmin) {
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $collector -MinutesBack 30
 
+$recoveryJson = $null
+try {
+  $recoveryJson = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $recovery -DelaySeconds 0 -CollectorPath $collector -OutputRoot $Root
+} catch {
+  $recoveryJson = [pscustomobject]@{
+    status = "recovery-invocation-failed"
+    error = $_.Exception.Message
+  } | ConvertTo-Json -Depth 4
+}
+
 $statusJson = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -Action Status
 
 [pscustomobject]@{
@@ -73,5 +84,6 @@ $statusJson = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $install
   user_evidence_root = $Root
   boot_evidence_root = "$env:ProgramData\AEGIS\LenovoPointer\BlackScreen"
   watcher_status = $(try { $statusJson | ConvertFrom-Json } catch { $statusJson })
-  next = "No reboot is forced. On the next startup, the SYSTEM watcher captures pre-login Hello/USB/display evidence; the logon watcher captures the user session."
+  immediate_recovery = $(try { $recoveryJson | ConvertFrom-Json } catch { $recoveryJson })
+  next = "No reboot is forced. Explorer recovery was attempted immediately and remains installed for future logons. On the next startup, the SYSTEM watcher captures pre-login Hello/USB/display evidence."
 } | ConvertTo-Json -Depth 8
