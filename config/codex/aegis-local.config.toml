@@ -1,6 +1,10 @@
 # AEGIS Local Codex profile
-# Copied to $CODEX_HOME/aegis-local.config.toml by the installer.
-# Inference provider is selected with --oss --local-provider ollama.
+# Local inference only. No hosted web search and no shell network access.
 oss_provider = "ollama"
 web_search = "disabled"
 sandbox_mode = "workspace-write"
+approval_policy = "never"
+allow_login_shell = false
+
+[sandbox_workspace_write]
+network_access = false
