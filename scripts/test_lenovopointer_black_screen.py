@@ -28,9 +28,12 @@ DANGEROUS = [
 def main() -> None:
     incident = json.loads(INCIDENT.read_text(encoding="utf-8"))
     assert incident["id"] == "lenovopointer-windows11-black-screen"
-    assert incident["status"] == "evidence-required"
+    assert incident["status"] in {"evidence-required", "instrumented-awaiting-real-failure-evidence"}
     assert incident["observed"]["causal_link_to_echo_studio"] == "not-proven"
     assert incident["cost"] == "free-built-in-Windows-tools-only"
+    if incident["status"] == "instrumented-awaiting-real-failure-evidence":
+        assert incident["validation"]["conclusion"] == "success"
+        assert incident["implementation"]["collector"] == "windows/Collect-LenovoPointerBlackScreen.ps1"
     assert "automatic display-driver uninstall" in incident["safety"]["forbidden"]
 
     collect = COLLECT.read_text(encoding="utf-8")
