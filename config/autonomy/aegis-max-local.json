@@ -33,7 +33,11 @@
     "docker_readonly_health_and_compose_validation": true,
     "docker_restart_only_if_explicit_autorepair_label": true,
     "retry_transient_local_failures_with_backoff": true,
-    "audit_service_lifecycle": true
+    "audit_service_lifecycle": true,
+    "route_local_models_by_task": true,
+    "wake_configured_lan_worker": true,
+    "accept_local_voice_tasks": true,
+    "auto_download_optional_models": false
   },
   "allowlisted_user_units": [
     "aegis-export.timer",
@@ -42,7 +46,8 @@
     "aegis-docker-efficiency.timer",
     "aegis-github-runner.service",
     "aegis-autonomy.timer",
-    "aegis-lifecycle.timer"
+    "aegis-lifecycle.timer",
+    "aegis-voice-bridge.service"
   ],
   "docker_autorepair": {
     "required_label": "aegis.autorepair=true",
