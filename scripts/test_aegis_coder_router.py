@@ -30,6 +30,10 @@ def main():
     assert "OPENCODE_DISABLE_LSP_DOWNLOAD=1" in s
     assert "OPENCODE_AUTO_SHARE=false" in s
     assert "AEGIS_CODER_BOOT_STATE_FILE" in s
+    assert "aegis_local_model_select.py" in s
+    assert "aegis_opencode_guard.py" in s
+    assert 'local_model=$LOCAL_MODEL' in s
+    assert "deepseek-r1:8b" in json.dumps(c)
     assert "boot_selected" in s
     assert "timeout 8s codex login status" in s
     assert "git -C \"$REPO_ROOT\" worktree add --detach" in s
