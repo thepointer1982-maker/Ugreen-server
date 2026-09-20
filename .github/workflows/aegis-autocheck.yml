@@ -206,7 +206,7 @@ jobs:
     runs-on: ${{ github.event.repository.private && 'aegis-ugreen-v2' || 'ubuntu-latest' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run AEGIS repository secret guard
         run: python3 scripts/aegis_secret_guard.py --repo-root .
@@ -322,7 +322,7 @@ jobs:
       - name: Validate MCP v2 module
         shell: bash
         run: |
-          python3 -m pip install --disable-pip-version-check "mcp[cli]>=2,<3"
+          python3 -m pip install --disable-pip-version-check "mcp[cli]==2.2.0"
           python3 - <<'PY'
           import importlib.util
           from pathlib import Path
@@ -413,7 +413,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
 
