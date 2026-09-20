@@ -211,8 +211,16 @@ def record_handoff(
         "last_handoff_channel": from_channel,
         "summary": _clean_text(summary, MAX_SUMMARY, "summary"),
         "pending_action": _clean_text(pending_action, MAX_PENDING, "pending_action"),
-        "decisions": _clean_items(decisions, "decisions"),
-        "blockers": _clean_items(blockers, "blockers"),
+        "decisions": (
+            _clean_items(decisions, "decisions")
+            if decisions is not None
+            else list(current.get("decisions", []))
+        ),
+        "blockers": (
+            _clean_items(blockers, "blockers")
+            if blockers is not None
+            else list(current.get("blockers", []))
+        ),
         "style_fingerprint": expected_style,
         "style_contract": project.get("style_contract", {}),
         "hard_constraints": project.get("hard_constraints", []),
