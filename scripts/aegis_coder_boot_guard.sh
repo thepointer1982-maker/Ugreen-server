@@ -10,6 +10,7 @@ CONFIG="$REPO_ROOT/config/opencode/aegis-local.json"
 CODEX_OSS_STATE="${AEGIS_CODEX_OSS_STATE_FILE:-$HOME/.local/state/aegis-codex-oss/status.json}"
 LOCAL_CODEX_WRAPPER="${AEGIS_CODEX_OSS_WRAPPER:-$HOME/.local/bin/aegis-codex-local}"
 ALLOW_CLOUD_CODEX="${AEGIS_ALLOW_CLOUD_CODEX:-0}"
+OPENCODE_GUARD="$REPO_ROOT/scripts/aegis_opencode_guard.py"
 
 [[ "$PREFER" == "codex-local" || "$PREFER" == "local" || "$PREFER" == "codex" ]] || {
   echo "invalid AEGIS_CODER_PREFER=$PREFER" >&2
@@ -73,7 +74,11 @@ PY
 fi
 
 opencode_ready=0
-command -v opencode >/dev/null 2>&1 && opencode_ready=1
+if command -v opencode >/dev/null 2>&1 && [[ -f "$OPENCODE_GUARD" ]]; then
+  if python3 "$OPENCODE_GUARD" --require-modern --no-write >/dev/null 2>&1; then
+    opencode_ready=1
+  fi
+fi
 config_ready=0
 [[ -f "$CONFIG" ]] && config_ready=1
 local_ready=0
