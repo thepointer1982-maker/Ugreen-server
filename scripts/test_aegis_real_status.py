@@ -29,6 +29,7 @@ def main() -> None:
         os.environ["AEGIS_SCHEDULER_STATE_DIR"] = str(root / "state" / "aegis-scheduler")
         os.environ["AEGIS_LKG_STATE_DIR"] = str(root / "state" / "aegis-last-known-good")
         os.environ["AEGIS_CODER_BOOT_STATE_FILE"] = str(root / "state" / "aegis-coder-boot" / "status.json")
+        os.environ["AEGIS_CODEX_OSS_STATE_FILE"] = str(root / "state" / "aegis-codex-oss" / "status.json")
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -36,6 +37,7 @@ def main() -> None:
             root / "state" / "aegis-guardian",
             root / "state" / "aegis-scheduler",
             root / "state" / "aegis-coder-boot",
+            root / "state" / "aegis-codex-oss",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -80,12 +82,33 @@ def main() -> None:
         (root / "state" / "aegis-coder-boot" / "status.json").write_text(
             json.dumps(
                 {
-                    "schema": "aegis-coder-boot/v1",
+                    "schema": "aegis-coder-boot/v2",
                     "health": "healthy",
-                    "reason": "preferred-local-ready",
-                    "selected": "local",
-                    "codex": {"ready": True, "auth": "chatgpt"},
-                    "local": {"ready": True},
+                    "reason": "codex-oss-ollama-ready",
+                    "selected": "codex-local",
+                    "codex_local": {"ready": True, "provider": "ollama"},
+                    "codex_cloud": {"ready": True, "auth": "chatgpt", "automatic_fallback_allowed": False},
+                    "opencode_local": {"ready": True},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "state" / "aegis-codex-oss" / "status.json").write_text(
+            json.dumps(
+                {
+                    "schema": "aegis-codex-oss/v1",
+                    "health": "healthy",
+                    "reason": "codex-oss-ollama-ready",
+                    "provider": "ollama",
+                    "model": "qwen2.5-coder:7b",
+                    "ollama_ready": True,
+                    "model_ready": True,
+                    "cloud_model_usage": False,
+                    "chatgpt_auth_required": False,
+                    "openai_api_key_required": False,
+                    "web_search": "disabled",
+                    "shell_network_access": False,
                 }
             ),
             encoding="utf-8",
@@ -108,7 +131,12 @@ def main() -> None:
         assert status["ollama"]["model_count"] == 1
         assert status["scheduler"]["timer"]["ActiveState"] == "active"
         assert status["coder"]["capability"] == "ready"
-        assert status["coder"]["selected"] == "local"
+        assert status["coder"]["selected"] == "codex-local"
+        assert status["coder"]["codex_oss"]["health"] == "healthy"
+        assert status["coder"]["codex_oss"]["provider"] == "ollama"
+        assert status["coder"]["codex_oss"]["cloud_model_usage"] is False
+        assert status["coder"]["codex_oss"]["openai_api_key_required"] is False
+        assert status["coder"]["codex_oss"]["web_search"] == "disabled"
         assert status["_provenance"]["kind"] == "real-status"
 
     print("AEGIS REAL STATUS TESTS PASS")
