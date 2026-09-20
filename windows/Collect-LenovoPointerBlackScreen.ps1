@@ -83,6 +83,28 @@ $biometricPnp = Safe-Run {
 } "biometric-pnp"
 Write-JsonFile (Join-Path $outDir "biometric-pnp.json") $biometricPnp
 
+$biometricSecurity = Safe-Run {
+  foreach ($dev in @($biometricPnp)) {
+    $instanceId = [string]$dev.InstanceId
+    if (-not $instanceId) { continue }
+    $configPath = "Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\$instanceId\Device Parameters\WinBio\Configurations"
+    $secureFingerprint = $null
+    $configurationBranches = 0
+    if (Test-Path -LiteralPath $configPath) {
+      $secureFingerprint = (Get-ItemProperty -LiteralPath $configPath -Name SecureFingerprint -ErrorAction SilentlyContinue).SecureFingerprint
+      $configurationBranches = @(Get-ChildItem -LiteralPath $configPath -ErrorAction SilentlyContinue).Count
+    }
+    [pscustomobject]@{
+      FriendlyName = $dev.FriendlyName
+      InstanceId = $instanceId
+      SecureFingerprint = $secureFingerprint
+      ConfigurationBranches = $configurationBranches
+      EssFingerprintCapable = ($secureFingerprint -eq 1 -and $configurationBranches -ge 2)
+    }
+  }
+} "biometric-security"
+Write-JsonFile (Join-Path $outDir "biometric-security.json") $biometricSecurity
+
 $usbApplePnp = Safe-Run {
   if (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue) {
     Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
@@ -314,6 +336,8 @@ $liveKernelCount = @($liveKernel).Count
 $biometric1108 = @($helloEvents | Where-Object { $_.LogName -eq "Microsoft-Windows-Biometrics/Operational" -and $_.Id -eq 1108 }).Count
 $biometricErrors = @($helloEvents | Where-Object { $_.LogName -eq "Microsoft-Windows-Biometrics/Operational" -and $_.LevelDisplayName -match "(?i)Error|Critical|Warning" }).Count
 $biometricEndpoints = @($biometricPnp).Count
+$secureFingerprintCount = @($biometricSecurity | Where-Object { $_.SecureFingerprint -eq 1 }).Count
+$essFingerprintCapableCount = @($biometricSecurity | Where-Object { $_.EssFingerprintCapable -eq $true }).Count
 $helloIsolationProcesses = @($processes | Where-Object { $_.Name -in @("bioiso","ngciso") }).Count
 $codexProcesses = @($processes | Where-Object { $_.Name -eq "codex" }).Count
 $usbAppleDevices = @($usbApplePnp | Where-Object { $_.FriendlyName -match "(?i)Apple|iPhone" }).Count
@@ -363,6 +387,8 @@ $summary = [ordered]@{
     biometric_event_1108 = $biometric1108
     biometric_warning_error_events = $biometricErrors
     biometric_pnp_endpoints = $biometricEndpoints
+    secure_fingerprint_sensor_count = $secureFingerprintCount
+    ess_fingerprint_capable_sensor_count = $essFingerprintCapableCount
     hello_isolation_processes = $helloIsolationProcesses
     codex_processes_alive = $codexProcesses
     apple_iphone_usb_devices = $usbAppleDevices
