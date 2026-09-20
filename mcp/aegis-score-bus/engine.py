@@ -177,6 +177,33 @@ def _candidate_metric(key: str, value: Any) -> bool:
     return leaf in STATUS_KEYS and (_number(value) is not None or _normalize_status(value) is not None)
 
 
+def _metric_direction(metric: str) -> str:
+    """Return whether a numeric metric is safer to interpret as higher/lower is better."""
+    leaf = re.sub(r"\[\d+\]$", "", metric.split(".")[-1]).lower()
+    if any(token in leaf for token in ("anomaly", "risk", "error", "failure", "latency")):
+        return "LOWER_IS_BETTER"
+    if (
+        "score" in leaf
+        or leaf in {
+            "health", "stability", "autonomy", "confidence", "learning",
+            "recovery", "failover", "network", "nas", "agents", "devices",
+        }
+    ):
+        return "HIGHER_IS_BETTER"
+    return "UNKNOWN"
+
+
+def _numeric_improvement(metric: str, delta: float | None) -> bool:
+    if delta is None or delta == 0:
+        return False
+    direction = _metric_direction(metric)
+    if direction == "HIGHER_IS_BETTER":
+        return delta > 0
+    if direction == "LOWER_IS_BETTER":
+        return delta < 0
+    return False
+
+
 def _extract_times(obj: Any) -> datetime | None:
     if not isinstance(obj, dict):
         return None
@@ -385,8 +412,7 @@ class ScoreEngine:
                     and provenance_verified
                     and freshness == "FRESH"
                     and hash_verified is not False
-                    and delta is not None
-                    and delta > 0
+                    and _numeric_improvement(metric, delta)
                 )
                 records.append(ScoreRecord(
                     key=key, name=metric, value=value, status=status, source=source, path=rel,
@@ -435,9 +461,13 @@ class ScoreEngine:
         if freshness in {"STALE", "FUTURE_TIMESTAMP"}:
             notes.append(freshness)
         if value is not None and prev_value is not None:
-            if value < prev_value:
+            delta = value - prev_value
+            direction = _metric_direction(metric)
+            if (direction == "HIGHER_IS_BETTER" and delta < 0) or (
+                direction == "LOWER_IS_BETTER" and delta > 0
+            ):
                 notes.append("NUMERIC_REGRESSION")
-            elif abs(value - prev_value) >= 25:
+            if abs(delta) >= 25:
                 notes.append("UNEXPECTED_JUMP")
         if status is not None and prev_status is not None and status != prev_status:
             if any(word in status.lower() for word in RISK_WORDS):
@@ -453,8 +483,7 @@ class ScoreEngine:
 
     @staticmethod
     def _metric_identity(name: str) -> str:
-        leaf = name.split(".")[-1]
-        return re.sub(r"\\[\\d+\\]", "", leaf).lower()
+        return re.sub(r"\[\d+\]", "[]", name).lower()
 
     def scan(self, include_unchanged: bool = False) -> dict[str, Any]:
         baseline = self._baseline()
@@ -503,6 +532,8 @@ class ScoreEngine:
         ]
         by_metric: dict[str, list[ScoreRecord]] = {}
         for record in current_verified:
+            if "[" in record.name:
+                continue
             by_metric.setdefault(self._metric_identity(record.name), []).append(record)
 
         conflicts: list[dict[str, Any]] = []
