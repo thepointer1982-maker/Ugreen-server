@@ -137,12 +137,19 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-coder-boot" / "status.json",
         )
     )
+    codex_oss_file = Path(
+        os.environ.get(
+            "AEGIS_CODEX_OSS_STATE_FILE",
+            home_state / "aegis-codex-oss" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
     guardian = read_json(guardian_dir / "status.json")
     scheduler = {}
     coder_boot = read_json(coder_boot_file)
+    codex_oss = read_json(codex_oss_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -247,6 +254,19 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "selected": coder_selected,
                 "reason": coder_reason,
                 "boot_state": coder_boot,
+                "codex_oss": {
+                    "health": codex_oss.get("health"),
+                    "reason": codex_oss.get("reason"),
+                    "provider": codex_oss.get("provider"),
+                    "model": codex_oss.get("model"),
+                    "ollama_ready": codex_oss.get("ollama_ready"),
+                    "model_ready": codex_oss.get("model_ready"),
+                    "cloud_model_usage": codex_oss.get("cloud_model_usage"),
+                    "chatgpt_auth_required": codex_oss.get("chatgpt_auth_required"),
+                    "openai_api_key_required": codex_oss.get("openai_api_key_required"),
+                    "web_search": codex_oss.get("web_search"),
+                    "shell_network_access": codex_oss.get("shell_network_access"),
+                },
             },
             "learning": {
                 "last_known_good": lkg.get("status"),
@@ -262,6 +282,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "guardian": file_state(guardian_dir / "status.json"),
                 "scheduler_state": file_state(env_path),
                 "coder_boot": file_state(coder_boot_file),
+                "codex_oss": file_state(codex_oss_file),
             },
         },
         kind="real-status",
