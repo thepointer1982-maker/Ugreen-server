@@ -49,12 +49,12 @@ def main() -> None:
         for row in manifest["integration_coverage"]
     }
     assert coverage["iphone-shortcuts"] == "implemented"
-    assert coverage["alexa-voice-context"] == "context-only"
-    assert coverage["opencode-local"] == "conditional"
+    assert coverage["alexa-voice-context"] == "local-bridge-ready"
+    assert coverage["opencode-local"] == "guarded-modern-conditional"
     assert coverage["tailscale-maintenance"] == "opt-in"
-    assert coverage["deepseek-explicit-route"] == "not-explicit"
+    assert coverage["deepseek-explicit-route"] == "implemented-conditional"
     assert coverage["astra-explicit-route"] == "not-local-core"
-    assert coverage["mac-worker-wol"] == "not-in-clean-branch"
+    assert coverage["mac-worker-wol"] == "implemented-unconfigured"
     assert coverage["windows-worker"] == "not-in-clean-branch"
 
     original_command_version = mod.command_version
