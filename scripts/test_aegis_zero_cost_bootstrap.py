@@ -26,6 +26,8 @@ def main():
     assert "aegis_coder_boot_install.sh" in text
     assert "aegis_docker_efficiency_install.sh" in text
     assert "aegis_autonomy_install.sh" in text
+    assert "aegis_service_lifecycle_install.sh" in text
+    assert "lifecycle=$LIFECYCLE_STATUS" in text
     assert "AUTO-MAX-LOCAL" in (ROOT / "config" / "autonomy" / "aegis-max-local.json").read_text(encoding="utf-8")
     assert "docker_efficiency=$DOCKER_EFFICIENCY_STATUS" in text
     assert "mcp_runtime=$MCP_STATUS" in text
