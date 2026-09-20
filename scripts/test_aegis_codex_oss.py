@@ -98,6 +98,10 @@ def main() -> None:
         assert '"record_project_handoff"' in generated_profile
         assert '"primary_control_status"' in generated_profile
         assert '"service_lifecycle_status"' in generated_profile
+        assert '"local_model_registry"' in generated_profile
+        assert '"worker_fleet_status"' in generated_profile
+        assert '"wake_worker"' in generated_profile
+        assert '"voice_bridge_status"' in generated_profile
         assert '"autonomy_status"' in generated_profile
         assert '"autonomy_policy"' in generated_profile
         assert '"enqueue_autonomy_task"' in generated_profile
