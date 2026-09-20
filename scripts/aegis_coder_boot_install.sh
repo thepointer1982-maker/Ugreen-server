@@ -6,10 +6,10 @@ UNIT_DIR="$HOME/.config/systemd/user"
 STATE_DIR="$HOME/.local/state/aegis-coder-boot"
 SERVICE="$UNIT_DIR/aegis-coder-boot.service"
 TIMER="$UNIT_DIR/aegis-coder-boot.timer"
-PREFER="${AEGIS_CODER_PREFER:-local}"
+PREFER="${AEGIS_CODER_PREFER:-codex-local}"
 
-[[ "$PREFER" == "local" || "$PREFER" == "codex" ]] || {
-  echo "AEGIS_CODER_PREFER must be local or codex" >&2
+[[ "$PREFER" == "codex-local" || "$PREFER" == "local" || "$PREFER" == "codex" ]] || {
+  echo "AEGIS_CODER_PREFER must be codex-local, local, or codex" >&2
   exit 64
 }
 
