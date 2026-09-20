@@ -59,6 +59,9 @@ if [[ "$MODE" == "local" ]]; then
     export OPENCODE_CONFIG="$CONFIG"
     export OPENCODE_DISABLE_AUTOUPDATE=1
     export OPENCODE_AUTO_SHARE=false
+    export OPENCODE_DISABLE_MODELS_FETCH=1
+    export OPENCODE_DISABLE_DEFAULT_PLUGINS=1
+    export OPENCODE_DISABLE_LSP_DOWNLOAD=1
     opencode run --dir "$WORKTREE" --model "ollama/$LOCAL_MODEL" --agent build "$TASK"
   ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
   rc=$?
@@ -68,11 +71,14 @@ else
     unset OPENAI_API_KEY
     unset OPENAI_ORG_ID
     unset OPENAI_PROJECT_ID
+    unset OPENAI_BASE_URL
+    unset CODEX_API_KEY
+    export LC_ALL=C
     codex login status 2>&1 | grep -Fq "Logged in using ChatGPT" || {
       echo "blocked: Codex is not authenticated with ChatGPT" >&2
       exit 5
     }
-    codex exec --ephemeral --sandbox workspace-write "$TASK"
+    codex exec --ignore-user-config --ephemeral --sandbox workspace-write "$TASK"
   ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
   rc=$?
 fi
