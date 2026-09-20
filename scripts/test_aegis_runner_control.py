@@ -35,6 +35,7 @@ def main():
 
     w = WORKFLOW.read_text(encoding="utf-8")
     assert "runs-on: [self-hosted, linux, aegis-ugreen-v2]" in w
+    assert "cancel-in-progress: true" in w
     assert "github.actor == 'thepointer1982-maker'" in w
     assert "pull_request:" not in w
     assert 'allowed = {"status", "real-cycle", "deploy-retry"}' in w
