@@ -11,7 +11,7 @@ def main():
     assert 'u.scheme != "https"' in s
     assert 'u.netloc != "raw.githubusercontent.com"' in s
     assert "thepointer1982-maker/Ugreen-server/{sha}/scripts/aegis_zero_cost_bootstrap.sh" in s
-    assert 'AEGIS_TRUSTED_SHA="$SHA" bash "$TMP_SCRIPT"' in s
+    assert 'AEGIS_TRUSTED_SHA="$SHA" AEGIS_DEST="$DEST" bash "$TMP_SCRIPT"' in s
     assert "aegis-pull-control/state.json" in s
     assert "aegis-coder-boot/status.json" in s
     assert "aegis-coder-boot.timer" in s
