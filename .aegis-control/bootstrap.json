@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "2dd91ab875f530986e6178c7ad4dc7219760279c",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/2dd91ab875f530986e6178c7ad4dc7219760279c/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/2dd91ab875f530986e6178c7ad4dc7219760279c/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/2dd91ab875f530986e6178c7ad4dc7219760279c/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 11,
+  "trusted_sha": "f9ac5badcb3f03203667633b4f18abe30591c79b",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/f9ac5badcb3f03203667633b4f18abe30591c79b/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/f9ac5badcb3f03203667633b4f18abe30591c79b/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/f9ac5badcb3f03203667633b4f18abe30591c79b/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 12,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "No credentials stored here. Native iPhone Shortcuts SSH is primary; a-Shell mini is a free fallback. Clean resume branch; coder boot guardian included."
+  "notes": "No credentials stored here. Clean resume core. Native iPhone Shortcuts bootstrap returns pull-control, coder boot state, and signed real status in one run."
 }
