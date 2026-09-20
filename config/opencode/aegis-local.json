@@ -15,6 +15,12 @@
         },
         "qwen2.5-coder:3b": {
           "name": "Qwen2.5 Coder 3B Local"
+        },
+        "deepseek-r1:8b": {
+          "name": "DeepSeek R1 8B Local Reasoning"
+        },
+        "deepseek-coder:6.7b": {
+          "name": "DeepSeek Coder 6.7B Legacy Optional"
         }
       }
     }
