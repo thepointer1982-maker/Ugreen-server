@@ -96,6 +96,7 @@ def main() -> None:
         assert "tool_timeout_sec = 10" in generated_profile
         assert '"project_context"' in generated_profile
         assert '"record_project_handoff"' in generated_profile
+        assert '"primary_control_status"' in generated_profile
         assert '"autonomy_status"' in generated_profile
         assert '"autonomy_policy"' in generated_profile
         assert '"enqueue_autonomy_task"' in generated_profile
