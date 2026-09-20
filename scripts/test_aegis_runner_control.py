@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent / "aegis_runner_install.sh"
@@ -10,14 +11,27 @@ WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "aegis-nas-control.y
 def main():
     p = subprocess.run(["bash", str(SCRIPT), "--help"], text=True, capture_output=True)
     assert p.returncode == 0
-    assert "token is never written" in p.stdout
+    assert "existing authenticated GitHub CLI session via gh api" in p.stdout
+    assert "token is never printed or written" in p.stdout
     assert "aegis-ugreen-v2" in p.stdout
 
-    env = os.environ.copy()
-    env.pop("AEGIS_RUNNER_TOKEN", None)
-    p = subprocess.run(["bash", str(SCRIPT)], text=True, capture_output=True, env=env)
-    assert p.returncode == 4
-    assert "AEGIS_RUNNER_TOKEN missing" in p.stderr
+    with tempfile.TemporaryDirectory() as raw:
+        fakebin = Path(raw)
+        gh = fakebin / "gh"
+        gh.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+        gh.chmod(0o755)
+        env = os.environ.copy()
+        env.pop("AEGIS_RUNNER_TOKEN", None)
+        env["PATH"] = str(fakebin) + os.pathsep + env.get("PATH", "")
+        p = subprocess.run(["bash", str(SCRIPT)], text=True, capture_output=True, env=env)
+        assert p.returncode == 4
+        assert "No runner registration token available" in p.stderr
+
+    s = SCRIPT.read_text(encoding="utf-8")
+    assert "gh auth status --hostname github.com" in s
+    assert "actions/runners/registration-token" in s
+    assert "--jq '.token'" in s
+    assert "RUNNER_TOKEN=\"\"" in s
 
     w = WORKFLOW.read_text(encoding="utf-8")
     assert "runs-on: [self-hosted, linux, aegis-ugreen-v2]" in w
