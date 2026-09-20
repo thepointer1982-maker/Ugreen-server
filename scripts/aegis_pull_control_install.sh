@@ -30,12 +30,12 @@ EOF
 
 cat > "$UNIT_DIR/aegis-pull-control.timer" <<'EOF'
 [Unit]
-Description=Run AEGIS outbound pull control every 5 minutes
+Description=Run AEGIS outbound pull control every minute
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=5min
-AccuracySec=30s
+OnBootSec=20s
+OnUnitActiveSec=60s
+AccuracySec=10s
 Persistent=true
 
 [Install]
