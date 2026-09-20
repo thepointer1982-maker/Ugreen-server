@@ -286,7 +286,7 @@ jobs:
           from mcp.server import MCPServer
           if not isinstance(mod.mcp, MCPServer):
               raise SystemExit('mcp object is not an MCPServer')
-          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'project_context', 'project_context_packet', 'project_continuity_check', 'record_project_handoff', 'autonomy_status', 'autonomy_policy', 'enqueue_autonomy_task', 'run_autonomy_cycle', 'run_guardian_cycle'):
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'project_context', 'project_context_packet', 'project_continuity_check', 'record_project_handoff', 'primary_control_status', 'autonomy_status', 'autonomy_policy', 'enqueue_autonomy_task', 'run_autonomy_cycle', 'run_guardian_cycle'):
               if not callable(getattr(mod, name, None)):
                   raise SystemExit(f'MCP callable missing: {name}')
           import os
