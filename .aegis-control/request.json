@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
-  "action": "status",
-  "sequence": 19,
-  "trusted_sha": "0b4df5ff238bce0be1e5d0bd05f1fb47d12219a1",
+  "action": "deploy-retry",
+  "sequence": 20,
+  "trusted_sha": "bca7a1ff199bacb7b715b920bc9e9a9661e30c12",
   "requested_by": "repository-owner",
-  "purpose": "physical-ugreen-auto-max-local-all-ai-autonomy-gate"
+  "purpose": "self-update-primary-pull-control-and-install-auto-max-local-stack"
 }
