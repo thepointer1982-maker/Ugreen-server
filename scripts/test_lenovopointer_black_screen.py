@@ -105,6 +105,10 @@ def main() -> None:
     assert "post-repair-shell-score-worsened" in supervise
     assert "explorer-recovery-not-confirmed" in supervise
     assert "InitialDelaySeconds" in supervise
+    assert "process_start_time" in supervise
+    assert "boot_time" in supervise
+    assert "invalid-cooldown-state" in supervise
+    assert "supervisor-already-running" in supervise
     assert "Invoke-Resolver -Mode \"Observe\"" in supervise
     assert "Invoke-Resolver -Mode \"Repair\"" in supervise
     assert "Disable-PnpDevice" not in supervise
