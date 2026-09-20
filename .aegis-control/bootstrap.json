@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "0ebcd17542f5a6fd909553939fc0d12cd7ddeece",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0ebcd17542f5a6fd909553939fc0d12cd7ddeece/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0ebcd17542f5a6fd909553939fc0d12cd7ddeece/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0ebcd17542f5a6fd909553939fc0d12cd7ddeece/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 14,
+  "trusted_sha": "b63e4ab6ca75c381129d9b88db477eeb01fd21d6",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/b63e4ab6ca75c381129d9b88db477eeb01fd21d6/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/b63e4ab6ca75c381129d9b88db477eeb01fd21d6/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/b63e4ab6ca75c381129d9b88db477eeb01fd21d6/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 15,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "Clean resume core. Local Codex/Ollama plus signed MCP project continuity. Chat-Alexa-Chat continuity regression passed. Cloud model fallback remains disabled by default."
+  "notes": "Optimized clean-resume core: runner reuse without re-registration, local MCP runtime, Local Codex/Ollama, zero-cloud boot with cloud auth probe skipped, signed project continuity, fast boot guardian, real-status proof for runner+MCP+coder."
 }
