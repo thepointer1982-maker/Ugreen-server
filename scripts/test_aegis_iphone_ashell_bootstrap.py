@@ -14,6 +14,9 @@ def main():
     assert "AEGIS_TRUSTED_SHA=$SHA bash -s" in text
     assert "aegis-pull-control.timer" in text
     assert "aegis-pull-control/state.json" in text
+    assert "aegis-coder-boot/status.json" in text
+    assert "aegis-coder-boot.timer" in text
+    assert "aegis-real-status/latest.json" in text
     assert "password" not in text.lower()
     assert "AEGIS_RUNNER_TOKEN" not in text
     assert "TS_AUTHKEY" not in text
