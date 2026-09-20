@@ -32,18 +32,22 @@ chmod 700 "$STATE_ROOT" "$WORK_ROOT" 2>/dev/null || true
   exit 4
 }
 
-git -C "$REPO_ROOT" worktree add --detach "$WORKTREE" HEAD >/dev/null
-cleanup() {
-  if [[ "${AEGIS_CODER_KEEP_WORKTREE:-0}" != "1" ]]; then
-    git -C "$REPO_ROOT" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+OLLAMA_READY_CACHE=-1
+ollama_loopback_ready() {
+  if [[ "$OLLAMA_READY_CACHE" == "1" ]]; then return 0; fi
+  if [[ "$OLLAMA_READY_CACHE" == "0" ]]; then return 1; fi
+  command -v curl >/dev/null 2>&1 || { OLLAMA_READY_CACHE=0; return 1; }
+  if curl -fsS --max-time 1 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    OLLAMA_READY_CACHE=1
+    return 0
   fi
+  OLLAMA_READY_CACHE=0
+  return 1
 }
-trap cleanup EXIT
 
 codex_local_ready() {
   [[ -x "$LOCAL_CODEX_WRAPPER" ]] || return 1
-  command -v curl >/dev/null 2>&1 || return 1
-  curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || return 1
+  ollama_loopback_ready || return 1
   [[ -s "$CODEX_OSS_STATE" ]] || return 1
   python3 - "$CODEX_OSS_STATE" <<'PY'
 import json, sys
@@ -65,8 +69,7 @@ PY
 
 opencode_local_ready() {
   command -v opencode >/dev/null 2>&1 || return 1
-  command -v curl >/dev/null 2>&1 || return 1
-  curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || return 1
+  ollama_loopback_ready || return 1
   [[ -f "$CONFIG" ]] || return 1
 }
 
@@ -204,6 +207,14 @@ print(
 )
 PY
 )"
+
+git -C "$REPO_ROOT" worktree add --detach "$WORKTREE" HEAD >/dev/null
+cleanup() {
+  if [[ "${AEGIS_CODER_KEEP_WORKTREE:-0}" != "1" ]]; then
+    git -C "$REPO_ROOT" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 
 echo "mode=$MODE" | tee "$REPORT/meta.txt"
 echo "context_channel=$CONTEXT_CHANNEL" | tee -a "$REPORT/meta.txt"
