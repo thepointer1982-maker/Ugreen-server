@@ -9,6 +9,8 @@ INCIDENT = ROOT / "incidents" / "lenovopointer-windows11-black-screen.json"
 COLLECT = ROOT / "windows" / "Collect-LenovoPointerBlackScreen.ps1"
 WATCH = ROOT / "windows" / "Watch-LenovoPointerBlackScreen.ps1"
 RECOVER = ROOT / "windows" / "Recover-LenovoPointerBlackScreen.ps1"
+RESOLVE = ROOT / "windows" / "Resolve-LenovoPointerBlackScreen.ps1"
+SUPERVISE = ROOT / "windows" / "Supervise-LenovoPointerBlackScreen.ps1"
 BOOTWATCH = ROOT / "windows" / "Watch-LenovoPointerBlackScreenBoot.ps1"
 INSTALL = ROOT / "windows" / "Install-LenovoPointerBlackScreenWatch.ps1"
 REPAIR = ROOT / "windows" / "Repair-LenovoPointerBlackScreen.ps1"
@@ -85,6 +87,30 @@ def main() -> None:
     assert "Set-ItemProperty" not in recover
     assert "recovery-events.jsonl" in recover
 
+    resolve = RESOLVE.read_text(encoding="utf-8")
+    assert 'ValidateSet("Observe","Repair")' in resolve
+    assert "MinRepeatedSnapshots" in resolve
+    assert "MinScore" in resolve
+    assert "safe-explorer-recovery" in resolve
+    assert "automatic-policy-blocks-disruptive-repair" in resolve
+    assert "ApplyFingerprintIsolation" not in resolve
+    assert "Disable-PnpDevice" not in resolve
+    assert "Set-ItemProperty" not in resolve
+    assert "Stop-Process" not in resolve
+
+    supervise = SUPERVISE.read_text(encoding="utf-8")
+    assert "supervisor.lock" in supervise
+    assert "CooldownMinutes" in supervise
+    assert "consecutiveErrors" in supervise
+    assert "post-repair-shell-score-worsened" in supervise
+    assert "explorer-recovery-not-confirmed" in supervise
+    assert "InitialDelaySeconds" in supervise
+    assert "Invoke-Resolver -Mode \"Observe\"" in supervise
+    assert "Invoke-Resolver -Mode \"Repair\"" in supervise
+    assert "Disable-PnpDevice" not in supervise
+    assert "Set-ItemProperty" not in supervise
+    assert "Stop-Process" not in supervise
+
     bootwatch = BOOTWATCH.read_text(encoding="utf-8")
     assert "$offsets = @(0, 10, 20, 30, 45, 60, 90, 120, 180)" in bootwatch
     assert "$env:ProgramData" in bootwatch
@@ -100,6 +126,10 @@ def main() -> None:
     assert "InstallBoot" in install and "InstallAll" in install
     assert "AEGIS-LenovoPointer-BlackScreenRecovery" in install
     assert "Recover-LenovoPointerBlackScreen.ps1" in install
+    assert "Resolve-LenovoPointerBlackScreen.ps1" in install
+    assert "Supervise-LenovoPointerBlackScreen.ps1" in install
+    assert "AEGIS-LenovoPointer-BlackScreenSupervisor" in install
+    assert "-MultipleInstances IgnoreNew" in install
     assert "Unregister-ScheduledTask" in install
 
     repair = REPAIR.read_text(encoding="utf-8")
@@ -131,7 +161,7 @@ def main() -> None:
     assert "HiberbootEnabled" in repair
 
     combined = "\n".join(
-        p.read_text(encoding="utf-8") for p in [COLLECT, WATCH, RECOVER, BOOTWATCH, INSTALL, REPAIR]
+        p.read_text(encoding="utf-8") for p in [COLLECT, WATCH, RECOVER, RESOLVE, SUPERVISE, BOOTWATCH, INSTALL, REPAIR]
     )
     for token in DANGEROUS:
         assert token.lower() not in combined.lower(), token
