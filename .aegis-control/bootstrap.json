@@ -1,10 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "9881c79467ac400c00dd32dd27e6ad85cafd79c1",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/9881c79467ac400c00dd32dd27e6ad85cafd79c1/scripts/aegis_zero_cost_bootstrap.sh",
-  "control_sequence": 9,
+  "trusted_sha": "39320f29b9c0207b63711f689279492275b8b25f",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/39320f29b9c0207b63711f689279492275b8b25f/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/39320f29b9c0207b63711f689279492275b8b25f/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/39320f29b9c0207b63711f689279492275b8b25f/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 10,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "No credentials stored here. Use the iPhone Shortcuts SSH action with the NAS account configured locally on the iPhone."
+  "notes": "No credentials stored here. Native iPhone Shortcuts SSH is primary; a-Shell mini is a free fallback."
 }
