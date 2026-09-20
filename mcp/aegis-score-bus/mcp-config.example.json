@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "aegis-score-bus": {
-      "command": "python3",
+      "command": "/srv/aegis/venvs/score-bus/bin/python",
       "args": ["/srv/aegis/repos/Ugreen-server/mcp/aegis-score-bus/server.py"],
       "env": {
         "AEGIS_UGREEN_REPO": "/srv/aegis/repos/Ugreen-server",
