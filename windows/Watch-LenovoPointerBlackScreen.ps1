@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $CollectorPath)) {
   throw "Collector not found: $CollectorPath"
 }
 
-$delays = @(0, 30, 90, 180)
+$delays = @(0, 30, 60, 90)
 foreach ($delay in $delays) {
   if ($delay -gt 0) { Start-Sleep -Seconds $delay }
   try {
