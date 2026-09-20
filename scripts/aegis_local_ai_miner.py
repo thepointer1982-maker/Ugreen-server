@@ -49,6 +49,21 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def rotate_if_large(path: Path, max_bytes: int = 2 * 1024 * 1024) -> bool:
+    try:
+        if not path.is_file() or path.stat().st_size <= max_bytes:
+            return False
+        rotated = path.with_suffix(path.suffix + ".1")
+        try:
+            rotated.unlink()
+        except FileNotFoundError:
+            pass
+        path.replace(rotated)
+        return True
+    except OSError:
+        return False
+
+
 def safe_stat(path: Path) -> dict[str, Any]:
     try:
         st = path.stat()
@@ -498,6 +513,7 @@ def main() -> int:
     tmp = REPORT.with_suffix(".tmp")
     tmp.write_text(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     tmp.replace(REPORT)
+    rotate_if_large(HISTORY)
     with HISTORY.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps({
             "generated_at": report["generated_at"],
