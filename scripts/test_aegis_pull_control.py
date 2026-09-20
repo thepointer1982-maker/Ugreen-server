@@ -32,6 +32,17 @@ def main():
         raise AssertionError("bad sha should be blocked")
     except RuntimeError:
         pass
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert '"git", "fetch", "--prune", "origin"' in source
+    assert 'merge-base", "--is-ancestor"' in source
+    assert '"shell"' not in mod.ALLOWED
+
+    installer = SCRIPT.parent / "aegis_pull_control_install.sh"
+    install_text = installer.read_text(encoding="utf-8")
+    assert 'ReadWritePaths="$REPO_ROOT"' in install_text
+    assert "OnUnitActiveSec=5min" in install_text
+    assert "ProtectHome=read-only" in install_text
+
     with tempfile.TemporaryDirectory() as raw:
         p = Path(raw) / "state.json"
         mod.atomic_write_json(p, {"last_sequence": 7})
