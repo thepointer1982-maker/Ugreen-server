@@ -17,7 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from aegis_provenance import attach_provenance
+from aegis_provenance import attach_provenance, verify_provenance
 
 STATE_DIR = Path(os.environ.get("AEGIS_AI_MINER_STATE_DIR", Path.home() / ".local/state/aegis-ai-miner"))
 REPORT = STATE_DIR / "latest.json"
@@ -34,6 +34,15 @@ DEFAULT_ROOTS = [
 TEXT_SUFFIXES = {".json", ".jsonl", ".log", ".txt", ".toml", ".md", ".yaml", ".yml"}
 DB_SUFFIXES = {".db", ".sqlite", ".sqlite3"}
 MAX_SCAN_FILES = 5000
+PRUNE_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "node_modules",
+    ".cache",
+    "cache",
+}
 
 
 def now_iso() -> str:
@@ -237,10 +246,43 @@ def ollama_summary() -> dict[str, Any]:
     return result
 
 
-def scan_roots(roots: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+def previous_db_cache() -> dict[str, dict[str, Any]]:
+    report = {}
+    try:
+        report = json.loads(REPORT.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(report, dict):
+        return {}
+    ok, _ = verify_provenance(report)
+    if not ok:
+        return {}
+    inventory = report.get("inventory")
+    dbs = inventory.get("sqlite_databases", []) if isinstance(inventory, dict) else []
+    cache: dict[str, dict[str, Any]] = {}
+    if isinstance(dbs, list):
+        for item in dbs:
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                cache[item["path"]] = item
+    return cache
+
+
+def scan_roots(
+    roots: list[Path],
+    *,
+    db_cache: dict[str, dict[str, Any]] | None = None,
+    scan_stats: dict[str, int] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
     files: list[dict[str, Any]] = []
     dbs: list[dict[str, Any]] = []
     suffix_counts: Counter[str] = Counter()
+    cache = db_cache or {}
+    stats = scan_stats if scan_stats is not None else {}
+    stats.setdefault("files_seen", 0)
+    stats.setdefault("db_cache_hits", 0)
+    stats.setdefault("db_cache_misses", 0)
+    stats.setdefault("dirs_pruned", 0)
+
     seen = 0
     for root in roots:
         try:
@@ -250,23 +292,65 @@ def scan_roots(roots: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, 
         if not exists:
             continue
         try:
-            iterator = root.rglob("*")
-            for path in iterator:
+            for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
+                keep_dirs: list[str] = []
+                for name in dirnames:
+                    candidate = Path(dirpath) / name
+                    if name in PRUNE_DIRS:
+                        stats["dirs_pruned"] += 1
+                        continue
+                    try:
+                        if candidate.is_symlink():
+                            stats["dirs_pruned"] += 1
+                            continue
+                    except OSError:
+                        stats["dirs_pruned"] += 1
+                        continue
+                    keep_dirs.append(name)
+                dirnames[:] = keep_dirs
+
+                for name in filenames:
+                    if seen >= MAX_SCAN_FILES:
+                        break
+                    path = Path(dirpath) / name
+                    try:
+                        if path.is_symlink() or not path.is_file():
+                            continue
+                    except OSError:
+                        continue
+
+                    seen += 1
+                    stats["files_seen"] = seen
+                    suffix = path.suffix.lower()
+                    suffix_counts[suffix or "(none)"] += 1
+
+                    if suffix in DB_SUFFIXES:
+                        meta = safe_stat(path)
+                        cached = cache.get(str(path))
+                        if (
+                            isinstance(cached, dict)
+                            and cached.get("mtime") == meta.get("mtime")
+                            and cached.get("size_bytes") == meta.get("size_bytes")
+                        ):
+                            reused = dict(cached)
+                            reused["cache_reused"] = True
+                            dbs.append(reused)
+                            stats["db_cache_hits"] += 1
+                        else:
+                            fresh = sqlite_summary(path)
+                            fresh["cache_reused"] = False
+                            dbs.append(fresh)
+                            stats["db_cache_misses"] += 1
+                    elif suffix in TEXT_SUFFIXES:
+                        files.append(
+                            {
+                                "path": str(path),
+                                "suffix": suffix,
+                                **safe_stat(path),
+                            }
+                        )
                 if seen >= MAX_SCAN_FILES:
                     break
-                try:
-                    if not path.is_file() or path.is_symlink():
-                        continue
-                except OSError:
-                    continue
-                seen += 1
-                suffix = path.suffix.lower()
-                suffix_counts[suffix or "(none)"] += 1
-                if suffix in DB_SUFFIXES:
-                    dbs.append(sqlite_summary(path))
-                elif suffix in TEXT_SUFFIXES:
-                    meta = {"path": str(path), "suffix": suffix, **safe_stat(path)}
-                    files.append(meta)
         except (OSError, PermissionError):
             continue
         if seen >= MAX_SCAN_FILES:
@@ -347,7 +431,12 @@ def main() -> int:
     args = parser.parse_args()
 
     roots = DEFAULT_ROOTS + [Path(p).expanduser() for p in args.root]
-    files, dbs, suffix_counts = scan_roots(roots)
+    scan_stats: dict[str, int] = {}
+    files, dbs, suffix_counts = scan_roots(
+        roots,
+        db_cache=previous_db_cache(),
+        scan_stats=scan_stats,
+    )
     ollama = ollama_summary()
     guardian = guardian_summary()
     findings = derive_findings(dbs, ollama, guardian)
@@ -361,6 +450,7 @@ def main() -> int:
             "text_protocol_files": files,
             "sqlite_databases": dbs,
             "suffix_counts": suffix_counts,
+            "scan_stats": scan_stats,
         },
         "ollama": ollama,
         "guardian": guardian,
