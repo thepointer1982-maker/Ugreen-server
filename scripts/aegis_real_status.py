@@ -206,6 +206,7 @@ def build_status(repo: Path) -> dict[str, Any]:
 
     health = "healthy"
     blockers: list[str] = []
+    warnings: list[str] = []
 
     if not real:
         health = "blocked"
@@ -268,22 +269,10 @@ def build_status(repo: Path) -> dict[str, Any]:
         and pull_control_timer.get("LoadState") == "loaded"
         and pull_control_timer.get("ActiveState") == "active"
     )
-    primary_control_ready = bool(
-        pull_timer_active
-        and (
-            not pull_control
-            or (
-                pull_control_ok
-                and pull_control.get("transport") == "outbound-pull"
-                and pull_control.get("runner_required") is False
-            )
-        )
-    )
+    primary_control_ready = bool(pull_timer_active)
 
     if pull_control and not pull_control_ok:
-        if health == "healthy":
-            health = "degraded"
-        blockers.append("pull-control-provenance-invalid")
+        warnings.append("pull-control-provenance-invalid")
     if (
         pull_control_timer.get("available")
         and pull_control_timer.get("LoadState") == "loaded"
@@ -334,6 +323,7 @@ def build_status(repo: Path) -> dict[str, Any]:
             "repo": str(repo),
             "health": health,
             "blockers": blockers,
+            "warnings": warnings,
             "real_cycle": {
                 "status": real.get("status"),
                 "reason": real.get("reason"),
@@ -368,15 +358,49 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "runner_required": False,
                 },
                 "pull_control": {
-                    "status": pull_control.get("status"),
-                    "transport": pull_control.get("transport"),
-                    "runner_required": pull_control.get("runner_required"),
-                    "last_sequence": pull_control.get("last_sequence"),
-                    "seen_sequence": pull_control.get("seen_sequence"),
-                    "sequence": pull_control.get("sequence"),
-                    "trusted_sha": pull_control.get("trusted_sha"),
-                    "completed_at": pull_control.get("completed_at"),
-                    "last_checked_at": pull_control.get("last_checked_at"),
+                    "status": (
+                        pull_control.get("status")
+                        if pull_control_ok
+                        else ("unverified" if pull_control else None)
+                    ),
+                    "transport": (
+                        pull_control.get("transport") if pull_control_ok else None
+                    ),
+                    "runner_required": (
+                        pull_control.get("runner_required")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "last_sequence": (
+                        pull_control.get("last_sequence")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "seen_sequence": (
+                        pull_control.get("seen_sequence")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "sequence": (
+                        pull_control.get("sequence")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "trusted_sha": (
+                        pull_control.get("trusted_sha")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "completed_at": (
+                        pull_control.get("completed_at")
+                        if pull_control_ok
+                        else None
+                    ),
+                    "last_checked_at": (
+                        pull_control.get("last_checked_at")
+                        if pull_control_ok
+                        else None
+                    ),
                     "provenance_verified": pull_control_ok if pull_control else None,
                     "provenance_reason": pull_control_reason,
                     "systemd_timer": pull_control_timer,
