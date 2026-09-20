@@ -10,6 +10,7 @@ def main():
     assert "raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/$TrustedSha/windows" in s
     assert "Install-LenovoPointerBlackScreenWatch.ps1" in s
     assert "Collect-LenovoPointerBlackScreen.ps1" in s
+    assert "Recover-LenovoPointerBlackScreen.ps1" in s
     assert "Repair-LenovoPointerBlackScreen.ps1" in s
     assert "Invoke-WebRequest" in s
     assert "forbidden token" in s
