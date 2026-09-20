@@ -87,6 +87,22 @@ def main() -> None:
         assert len(dbs4) == 1
         assert stats4["dirs_pruned"] >= 1
 
+        history = root / "history.jsonl"
+        history.write_text(
+            "".join(f'{{"n":{i}}}\n' for i in range(500)),
+            encoding="utf-8",
+        )
+        tail = mod.tail_lines(history, 200)
+        assert len(tail) == 200
+        assert tail[0] == '{"n":300}'
+        assert tail[-1] == '{"n":499}'
+
+        rotate_me = root / "rotate.jsonl"
+        rotate_me.write_text("x" * 64, encoding="utf-8")
+        assert mod.rotate_if_large(rotate_me, max_bytes=16) is True
+        assert not rotate_me.exists()
+        assert (root / "rotate.jsonl.1").read_text(encoding="utf-8") == "x" * 64
+
     findings = mod.derive_findings(
         [],
         {"reachable": False},
