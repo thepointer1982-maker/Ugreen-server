@@ -37,7 +37,8 @@
     "route_local_models_by_task": true,
     "wake_configured_lan_worker": true,
     "accept_local_voice_tasks": true,
-    "auto_download_optional_models": false
+    "auto_download_optional_models": false,
+    "maintain_offline_source_escrow": true
   },
   "allowlisted_user_units": [
     "aegis-export.timer",
@@ -47,7 +48,8 @@
     "aegis-github-runner.service",
     "aegis-autonomy.timer",
     "aegis-lifecycle.timer",
-    "aegis-voice-bridge.service"
+    "aegis-voice-bridge.service",
+    "aegis-offline-escrow.timer"
   ],
   "docker_autorepair": {
     "required_label": "aegis.autorepair=true",
@@ -91,6 +93,7 @@
     "self_hosted_ci_when_private": true,
     "tailscale_default_enabled": false,
     "alexa_cloud_in_production_core": false,
-    "external_telemetry_default_enabled": false
+    "external_telemetry_default_enabled": false,
+    "local_offline_source_escrow": true
   }
 }
