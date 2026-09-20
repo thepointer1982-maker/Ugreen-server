@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: aegis-nas-control-v2
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   nas-control:
