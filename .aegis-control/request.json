@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "deploy-retry",
-  "sequence": 21,
-  "trusted_sha": "59c4dc7f053ba877a8b2bb361237bcede52787af",
+  "sequence": 22,
+  "trusted_sha": "21a255a15b898a680fc9beecdd977f2c95348be7",
   "requested_by": "repository-owner",
-  "purpose": "install-service-lifecycle-guardian-and-audit-all-aegis-integrations"
+  "purpose": "install-guarded-opencode-deepseek-routing-worker-wol-and-local-voice-bridge"
 }
