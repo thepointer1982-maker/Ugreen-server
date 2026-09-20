@@ -53,9 +53,9 @@ cat > "$TIMER" <<'EOF'
 Description=Keep AEGIS coder backends boot-ready
 
 [Timer]
-OnBootSec=45s
-OnUnitActiveSec=10min
-AccuracySec=30s
+OnBootSec=12s
+OnUnitActiveSec=5min
+AccuracySec=10s
 Persistent=true
 Unit=aegis-coder-boot.service
 
