@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $UserTaskName = "AEGIS-LenovoPointer-BlackScreenWatch"
+$RecoveryTaskName = "AEGIS-LenovoPointer-BlackScreenRecovery"
 $BootTaskName = "AEGIS-LenovoPointer-BlackScreenBootWatch"
 $UserRoot = Join-Path $env:LOCALAPPDATA "AEGIS\LenovoPointer\BlackScreen"
 $UserBin = Join-Path $UserRoot "bin"
@@ -13,9 +14,11 @@ $BootBin = Join-Path $BootRoot "bin"
 
 $CollectorSrc = Join-Path $PSScriptRoot "Collect-LenovoPointerBlackScreen.ps1"
 $WatchSrc = Join-Path $PSScriptRoot "Watch-LenovoPointerBlackScreen.ps1"
+$RecoverySrc = Join-Path $PSScriptRoot "Recover-LenovoPointerBlackScreen.ps1"
 $BootWatchSrc = Join-Path $PSScriptRoot "Watch-LenovoPointerBlackScreenBoot.ps1"
 $CollectorDst = Join-Path $UserBin "Collect-LenovoPointerBlackScreen.ps1"
 $WatchDst = Join-Path $UserBin "Watch-LenovoPointerBlackScreen.ps1"
+$RecoveryDst = Join-Path $UserBin "Recover-LenovoPointerBlackScreen.ps1"
 $BootCollectorDst = Join-Path $BootBin "Collect-LenovoPointerBlackScreen.ps1"
 $BootWatchDst = Join-Path $BootBin "Watch-LenovoPointerBlackScreenBoot.ps1"
 
@@ -47,6 +50,7 @@ function Show-Status {
   [pscustomobject]@{
     admin = (Test-Admin)
     user_task = Get-TaskState $UserTaskName
+    recovery_task = Get-TaskState $RecoveryTaskName
     boot_task = Get-TaskState $BootTaskName
     user_evidence_root = $UserRoot
     boot_evidence_root = $BootRoot
@@ -54,12 +58,13 @@ function Show-Status {
 }
 
 function Install-UserWatch {
-  foreach ($path in @($CollectorSrc,$WatchSrc)) {
+  foreach ($path in @($CollectorSrc,$WatchSrc,$RecoverySrc)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Required file missing: $path" }
   }
   New-Item -ItemType Directory -Path $UserBin -Force | Out-Null
   Copy-Item -LiteralPath $CollectorSrc -Destination $CollectorDst -Force
   Copy-Item -LiteralPath $WatchSrc -Destination $WatchDst -Force
+  Copy-Item -LiteralPath $RecoverySrc -Destination $RecoveryDst -Force
 
   $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
   $quoted = "`"$WatchDst`""
@@ -68,6 +73,10 @@ function Install-UserWatch {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
   $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
   Register-ScheduledTask -TaskName $UserTaskName -Action $taskAction -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+
+  $recoveryArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$RecoveryDst`" -DelaySeconds 20 -CollectorPath `"$CollectorDst`" -OutputRoot `"$UserRoot`""
+  $recoveryAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $recoveryArgs
+  Register-ScheduledTask -TaskName $RecoveryTaskName -Action $recoveryAction -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 }
 
 function Protect-BootRoot {
@@ -96,6 +105,7 @@ function Install-BootWatch {
 
 function Remove-UserWatch {
   Unregister-ScheduledTask -TaskName $UserTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $RecoveryTaskName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
 function Remove-BootWatch {
