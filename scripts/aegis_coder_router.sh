@@ -18,6 +18,8 @@ BOOT_STATE="${AEGIS_CODER_BOOT_STATE_FILE:-$HOME/.local/state/aegis-coder-boot/s
 CODEX_OSS_STATE="${AEGIS_CODEX_OSS_STATE_FILE:-$HOME/.local/state/aegis-codex-oss/status.json}"
 LOCAL_CODEX_WRAPPER="${AEGIS_CODEX_OSS_WRAPPER:-$HOME/.local/bin/aegis-codex-local}"
 ALLOW_CLOUD_CODEX="${AEGIS_ALLOW_CLOUD_CODEX:-0}"
+PROJECT_CONTEXT_SCRIPT="$REPO_ROOT/scripts/aegis_project_context.py"
+PROJECT_CONTEXT_REQUIRED="${AEGIS_PROJECT_CONTEXT_REQUIRED:-1}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 WORKTREE="$WORK_ROOT/$STAMP"
 REPORT="$STATE_ROOT/$STAMP"
@@ -158,7 +160,54 @@ case "$MODE" in
     ;;
 esac
 
+case "$MODE" in
+  codex-local) CONTEXT_CHANNEL="codex-local" ;;
+  local) CONTEXT_CHANNEL="opencode-local" ;;
+  codex) CONTEXT_CHANNEL="chat" ;;
+  *) CONTEXT_CHANNEL="mcp" ;;
+esac
+
+context_rc=0
+CONTEXT_PACKET=""
+if [[ -f "$PROJECT_CONTEXT_SCRIPT" ]]; then
+  set +e
+  CONTEXT_PACKET="$(AEGIS_REPO_ROOT="$REPO_ROOT" python3 "$PROJECT_CONTEXT_SCRIPT" packet --channel "$CONTEXT_CHANNEL" 2>"$REPORT/project-context.stderr")"
+  context_rc=$?
+  set -e
+else
+  context_rc=127
+  echo "project context script missing: $PROJECT_CONTEXT_SCRIPT" >"$REPORT/project-context.stderr"
+fi
+
+if [[ "$PROJECT_CONTEXT_REQUIRED" == "1" && "$context_rc" -ne 0 ]]; then
+  echo "blocked: signed AEGIS project context is unavailable" >&2
+  exit 6
+fi
+if [[ -z "$CONTEXT_PACKET" ]]; then
+  CONTEXT_PACKET='{"status":"unavailable"}'
+fi
+printf '%s\n' "$CONTEXT_PACKET" > "$REPORT/project-context.json"
+
+FULL_TASK="$(python3 - "$REPORT/project-context.json" "$TASK" <<'PY'
+import json, sys
+from pathlib import Path
+packet = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+task = sys.argv[2]
+print(
+    "AEGIS AUTHORITATIVE PROJECT CONTEXT\n"
+    "Preserve project_id, thread_id, style contract, hard constraints, decisions, "
+    "blockers, and pending action across this task. Do not invent real hardware "
+    "state. Continue the existing project rather than starting a new project.\n"
+    + json.dumps(packet, ensure_ascii=False, sort_keys=True)
+    + "\n\nUSER TASK\n"
+    + task
+)
+PY
+)"
+
 echo "mode=$MODE" | tee "$REPORT/meta.txt"
+echo "context_channel=$CONTEXT_CHANNEL" | tee -a "$REPORT/meta.txt"
+echo "context_required=$PROJECT_CONTEXT_REQUIRED" | tee -a "$REPORT/meta.txt"
 echo "cloud_fallback_allowed=$ALLOW_CLOUD_CODEX" | tee -a "$REPORT/meta.txt"
 echo "boot_state=$BOOT_STATE" | tee -a "$REPORT/meta.txt"
 echo "worktree=$WORKTREE" | tee -a "$REPORT/meta.txt"
@@ -170,7 +219,7 @@ case "$MODE" in
       cd "$WORKTREE"
       unset OPENAI_API_KEY OPENAI_ORG_ID OPENAI_PROJECT_ID OPENAI_BASE_URL CODEX_API_KEY CODEX_ACCESS_TOKEN
       export LC_ALL=C
-      "$LOCAL_CODEX_WRAPPER" exec "$TASK"
+      "$LOCAL_CODEX_WRAPPER" exec "$FULL_TASK"
     ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
     rc=$?
     ;;
@@ -183,7 +232,7 @@ case "$MODE" in
       export OPENCODE_DISABLE_MODELS_FETCH=1
       export OPENCODE_DISABLE_DEFAULT_PLUGINS=1
       export OPENCODE_DISABLE_LSP_DOWNLOAD=1
-      opencode run --dir "$WORKTREE" --model "ollama/$LOCAL_MODEL" --agent build "$TASK"
+      opencode run --dir "$WORKTREE" --model "ollama/$LOCAL_MODEL" --agent build "$FULL_TASK"
     ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
     rc=$?
     ;;
@@ -196,7 +245,7 @@ case "$MODE" in
         echo "blocked: Codex is not authenticated with ChatGPT" >&2
         exit 5
       }
-      codex exec --ignore-user-config --ephemeral --sandbox workspace-write "$TASK"
+      codex exec --ignore-user-config --ephemeral --sandbox workspace-write "$FULL_TASK"
     ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
     rc=$?
     ;;
@@ -216,7 +265,7 @@ if [[ -d "$WORKTREE/scripts" ]]; then
 fi
 
 cat > "$REPORT/result.json" <<EOF
-{"mode":"$MODE","agent_rc":$rc,"validation_rc":$validate_rc,"report":"$REPORT","worktree_kept":${AEGIS_CODER_KEEP_WORKTREE:-0},"cloud_fallback_allowed":$ALLOW_CLOUD_CODEX}
+{"mode":"$MODE","agent_rc":$rc,"validation_rc":$validate_rc,"report":"$REPORT","worktree_kept":${AEGIS_CODER_KEEP_WORKTREE:-0},"cloud_fallback_allowed":$ALLOW_CLOUD_CODEX,"project_context_required":$PROJECT_CONTEXT_REQUIRED,"context_channel":"$CONTEXT_CHANNEL"}
 EOF
 cat "$REPORT/result.json"
 
