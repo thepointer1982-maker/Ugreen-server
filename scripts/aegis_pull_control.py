@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 CONTROL_REF = "refs/remotes/origin/aegis-control"
-DEV_REF = "refs/remotes/origin/aegis/guardian-learning-mcp"
+DEV_REF = "refs/remotes/origin/aegis/resume-pre-lenovo-20260920"
 CONTROL_PATH = ".aegis-control/request.json"
 ALLOWED = {"status", "real-cycle", "deploy-retry"}
 
@@ -63,7 +63,7 @@ def fetch_refs(repo: Path) -> None:
     run([
         "git", "fetch", "--prune", "origin",
         "+refs/heads/aegis-control:refs/remotes/origin/aegis-control",
-        "+refs/heads/aegis/guardian-learning-mcp:refs/remotes/origin/aegis/guardian-learning-mcp",
+        "+refs/heads/aegis/resume-pre-lenovo-20260920:refs/remotes/origin/aegis/resume-pre-lenovo-20260920",
     ], repo, timeout=180)
 
 def load_request(repo: Path) -> dict:
