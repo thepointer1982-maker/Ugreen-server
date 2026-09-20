@@ -54,7 +54,14 @@ def main() -> None:
     assert "WbioSrvc" in collect
     assert "codex" in collect
     assert "usb-apple-pnp.json" in collect
+    assert "audio-endpoints.json" in collect
+    assert "credential-providers.json" in collect
+    assert "credential-provider-filters.json" in collect
+    assert "SignatureStatus" in collect
     assert "powercfg /a" in collect
+    assert "echo_audio_endpoint_count" in collect
+    assert "headset_audio_endpoint_count" in collect
+    assert "credential_provider_filter_count" in collect
 
     watch = WATCH.read_text(encoding="utf-8")
     assert "$delays = @(0, 30, 60, 90)" in watch
