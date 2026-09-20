@@ -82,27 +82,31 @@ if [[ "$opencode_ready" -eq 1 && "$ollama_ready" -eq 1 && "$config_ready" -eq 1 
 fi
 
 codex_cli="missing"
-codex_auth="unavailable"
+codex_auth="skipped"
 codex_cloud_ready=0
-codex_status_rc=127
+codex_status_rc=125
+codex_cloud_check_performed=0
 if command -v codex >/dev/null 2>&1; then
   codex_cli="installed"
-  set +e
-  if command -v timeout >/dev/null 2>&1; then
-    codex_status="$(timeout 15s codex login status 2>&1)"
-    codex_status_rc=$?
-  else
-    codex_status="$(codex login status 2>&1)"
-    codex_status_rc=$?
-  fi
-  set -e
-  if grep -Fq "Logged in using ChatGPT" <<<"$codex_status"; then
-    codex_auth="chatgpt"
-    codex_cloud_ready=1
-  elif [[ "$codex_status_rc" -eq 0 ]]; then
-    codex_auth="non-chatgpt"
-  else
-    codex_auth="not-logged-in"
+  if [[ "$ALLOW_CLOUD_CODEX" == "1" || "$PREFER" == "codex" ]]; then
+    codex_cloud_check_performed=1
+    set +e
+    if command -v timeout >/dev/null 2>&1; then
+      codex_status="$(timeout 8s codex login status 2>&1)"
+      codex_status_rc=$?
+    else
+      codex_status="$(codex login status 2>&1)"
+      codex_status_rc=$?
+    fi
+    set -e
+    if grep -Fq "Logged in using ChatGPT" <<<"$codex_status"; then
+      codex_auth="chatgpt"
+      codex_cloud_ready=1
+    elif [[ "$codex_status_rc" -eq 0 ]]; then
+      codex_auth="non-chatgpt"
+    else
+      codex_auth="not-logged-in"
+    fi
   fi
 fi
 
@@ -171,6 +175,7 @@ export AEGIS_CODER_BOOT_CODEX_CLI="$codex_cli"
 export AEGIS_CODER_BOOT_CODEX_AUTH="$codex_auth"
 export AEGIS_CODER_BOOT_CODEX_CLOUD_READY="$codex_cloud_ready"
 export AEGIS_CODER_BOOT_CODEX_RC="$codex_status_rc"
+export AEGIS_CODER_BOOT_CODEX_CLOUD_CHECK="$codex_cloud_check_performed"
 export AEGIS_CODER_BOOT_OPENCODE_READY="$opencode_ready"
 export AEGIS_CODER_BOOT_OLLAMA_READY="$ollama_ready"
 export AEGIS_CODER_BOOT_CONFIG_READY="$config_ready"
@@ -204,6 +209,7 @@ data = {
         "auth": os.environ["AEGIS_CODER_BOOT_CODEX_AUTH"],
         "ready": os.environ["AEGIS_CODER_BOOT_CODEX_CLOUD_READY"] == "1",
         "status_rc": int(os.environ["AEGIS_CODER_BOOT_CODEX_RC"]),
+        "status_check_performed": os.environ["AEGIS_CODER_BOOT_CODEX_CLOUD_CHECK"] == "1",
         "automatic_fallback_allowed": os.environ["AEGIS_CODER_BOOT_ALLOW_CLOUD"] == "1",
         "api_key_auth_allowed": False,
     },
