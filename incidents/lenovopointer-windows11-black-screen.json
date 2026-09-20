@@ -3,7 +3,7 @@
   "id": "lenovopointer-windows11-black-screen",
   "device": "lenovopointer",
   "os": "Windows 11",
-  "status": "evidence-required",
+  "status": "instrumented-awaiting-real-failure-evidence",
   "observed": {
     "phase": "shortly-after-Windows-start-or-login",
     "echo_studio_connection": "Bluetooth or Wi-Fi observed shortly before black screen",
@@ -43,5 +43,21 @@
     ]
   },
   "cost": "free-built-in-Windows-tools-only",
-  "next_gate": "capture at least one failing-boot evidence set before persistent driver changes"
+  "next_gate": "install watcher on LenovoPointer, reproduce once, then choose only the evidence-supported reversible fix",
+  "implementation": {
+    "collector": "windows/Collect-LenovoPointerBlackScreen.ps1",
+    "logon_watcher": "windows/Watch-LenovoPointerBlackScreen.ps1",
+    "watcher_installer": "windows/Install-LenovoPointerBlackScreenWatch.ps1",
+    "reversible_repair": "windows/Repair-LenovoPointerBlackScreen.ps1",
+    "one_command_bootstrap": "windows/Bootstrap-LenovoPointerBlackScreen.ps1",
+    "documentation": "docs/lenovopointer-black-screen.md"
+  },
+  "validation": {
+    "workflow": "AEGIS Autocheck",
+    "run_number": 178,
+    "conclusion": "success",
+    "tested_head": "0ddd94b150e589d1f5c61a7f7c6b44a00ecec1ae",
+    "powershell_parser": "success",
+    "safety_regression": "success"
+  }
 }
