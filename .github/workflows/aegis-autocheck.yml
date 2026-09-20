@@ -52,6 +52,7 @@ on:
       - 'scripts/aegis_real_status.py'
       - 'scripts/aegis_mcp_server.py'
       - 'scripts/aegis_docker_efficiency.py'
+      - 'scripts/aegis_docker_efficiency_install.sh'
       - 'scripts/test_aegis_docker_efficiency.py'
       - 'scripts/aegis_mcp_runtime_install.sh'
       - 'scripts/test_aegis_mcp_runtime.py'
@@ -123,6 +124,7 @@ on:
       - '.github/workflows/aegis-nas-control.yml'
       - 'scripts/aegis_mcp_server.py'
       - 'scripts/aegis_docker_efficiency.py'
+      - 'scripts/aegis_docker_efficiency_install.sh'
       - 'scripts/test_aegis_docker_efficiency.py'
       - 'scripts/aegis_mcp_runtime_install.sh'
       - 'scripts/test_aegis_mcp_runtime.py'
@@ -224,7 +226,7 @@ jobs:
         run: python3 scripts/test_aegis_docker_efficiency.py
 
       - name: Validate hardened shell syntax
-        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_zero_cost_bootstrap.sh scripts/aegis_iphone_ashell_bootstrap.sh scripts/aegis_shortcuts_remote_launcher.sh scripts/aegis_coder_router.sh scripts/aegis_coder_boot_guard.sh scripts/aegis_coder_boot_install.sh scripts/aegis_codex_oss_install.sh scripts/aegis_user_persistence.sh scripts/aegis_mcp_runtime_install.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
+        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_zero_cost_bootstrap.sh scripts/aegis_iphone_ashell_bootstrap.sh scripts/aegis_shortcuts_remote_launcher.sh scripts/aegis_coder_router.sh scripts/aegis_coder_boot_guard.sh scripts/aegis_coder_boot_install.sh scripts/aegis_codex_oss_install.sh scripts/aegis_user_persistence.sh scripts/aegis_mcp_runtime_install.sh scripts/aegis_docker_efficiency_install.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
 
       - name: Run AEGIS guardian regression tests
         run: python3 scripts/test_aegis_guardian.py
