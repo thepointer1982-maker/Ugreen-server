@@ -380,8 +380,13 @@ class ScoreEngine:
                 delta = value - prev_value if value is not None and prev_value is not None else None
                 warning = self._warning(metric, value, status, prev_value, prev_status, evidence, freshness, hash_verified)
                 countable = bool(
-                    changed and evidence in REAL_EVIDENCE and provenance_verified and
-                    freshness == "FRESH" and hash_verified is not False
+                    changed
+                    and evidence in REAL_EVIDENCE
+                    and provenance_verified
+                    and freshness == "FRESH"
+                    and hash_verified is not False
+                    and delta is not None
+                    and delta > 0
                 )
                 records.append(ScoreRecord(
                     key=key, name=metric, value=value, status=status, source=source, path=rel,
@@ -472,14 +477,21 @@ class ScoreEngine:
             ))
             and (r.evidence_class in REAL_EVIDENCE or r.hash_verified is False)
         ]
-        real_changes = [r for r in records if r.counts_as_real_improvement]
-        first_real_device_values = [
+        real_verified_changes = [
             r for r in records
-            if r.new
-            and r.evidence_class == "REAL_DEVICE_MEASUREMENT"
+            if r.evidence_class in REAL_EVIDENCE
             and r.provenance_verified
             and r.freshness == "FRESH"
             and r.hash_verified is not False
+        ]
+        real_improvements = [r for r in records if r.counts_as_real_improvement]
+        first_real_device_values = [
+            r for r in records
+            if r.evidence_class == "REAL_DEVICE_MEASUREMENT"
+            and r.provenance_verified
+            and r.freshness == "FRESH"
+            and r.hash_verified is not False
+            and previous.get(r.key, {}).get("evidence_class") != "REAL_DEVICE_MEASUREMENT"
         ]
 
         current_verified = [
@@ -516,6 +528,16 @@ class ScoreEngine:
                     ],
                 })
 
+        changed_keys = {r.key for r in records}
+        new_or_changed_conflicts = [
+            conflict for conflict in conflicts
+            if any(
+                record.key in changed_keys
+                for record in current_verified
+                if self._metric_identity(record.name) == conflict["name"]
+            )
+        ]
+
         current_keys = {r.key for r in all_records}
         available_sources = {name for name, root in self.roots.items() if root.exists()}
         missing_verified_records = [
@@ -537,18 +559,21 @@ class ScoreEngine:
             "source_status": self.source_status(),
             "files_scanned": files_scanned,
             "changed_count": len(records),
-            "real_verified_change_count": len(real_changes),
+            "real_verified_change_count": len(real_verified_changes),
+            "real_improvement_count": len(real_improvements),
             "alert_count": len(alerts),
             "conflict_count": len(conflicts),
+            "new_or_changed_conflict_count": len(new_or_changed_conflicts),
             "first_real_device_value_count": len(first_real_device_values),
             "missing_verified_record_count": len(missing_verified_records),
             "records": [asdict(r) for r in records],
             "alerts": [asdict(r) for r in alerts],
             "conflicts": conflicts,
+            "new_or_changed_conflicts": new_or_changed_conflicts,
             "first_real_device_values": [asdict(r) for r in first_real_device_values],
             "missing_verified_records": missing_verified_records,
             "notification_recommended": bool(
-                real_changes or alerts or conflicts or missing_verified_records
+                real_verified_changes or alerts or new_or_changed_conflicts or missing_verified_records
             ),
         }
 
