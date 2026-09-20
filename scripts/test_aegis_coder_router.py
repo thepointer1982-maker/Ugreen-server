@@ -33,12 +33,12 @@ def main():
     assert "aegis_local_model_select.py" in s
     assert "aegis_opencode_guard.py" in s
     assert 'local_model=$LOCAL_MODEL' in s
-    assert "deepseek-r1:8b" in json.dumps(c)
     assert "boot_selected" in s
     assert "timeout 8s codex login status" in s
     assert "git -C \"$REPO_ROOT\" worktree add --detach" in s
     assert "git -C \"$WORKTREE\" diff --check" in s
     c = json.loads(CONFIG.read_text(encoding="utf-8"))
+    assert "deepseek-r1:8b" in json.dumps(c)
     assert c["model"] == "ollama/qwen2.5-coder:7b"
     assert c["provider"]["ollama"]["options"]["baseURL"] == "http://127.0.0.1:11434/v1"
     assert c["permission"]["external_directory"] == "deny"
