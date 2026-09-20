@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama/qwen2.5-coder:7b",
+  "autoupdate": false,
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:7b": {
+          "name": "Qwen2.5 Coder 7B Local"
+        },
+        "qwen2.5-coder:3b": {
+          "name": "Qwen2.5 Coder 3B Local"
+        }
+      }
+    }
+  },
+  "permission": {
+    "external_directory": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "task": "deny",
+    "read": "allow",
+    "edit": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "lsp": "allow",
+    "bash": {
+      "*": "deny",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git grep*": "allow",
+      "git log*": "allow",
+      "python3 -m compileall*": "allow",
+      "python3 scripts/test_*": "allow",
+      "bash -n *": "allow"
+    }
+  }
+}
