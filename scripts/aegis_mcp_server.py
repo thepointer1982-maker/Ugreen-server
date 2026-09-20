@@ -15,6 +15,12 @@ if str(SCRIPT_DIR) not in sys.path:
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
 from aegis_local_ai_miner import REPORT as AI_REPORT
 from aegis_last_known_good import active_status, activate_current_lkg, current, provisional_status, observe_provisional, restore
+from aegis_project_context import (
+    context_packet as project_context_packet_impl,
+    continuity_check as project_continuity_check_impl,
+    read_state as project_context_impl,
+    record_handoff as record_project_handoff_impl,
+)
 
 REPO_ROOT = Path(
     os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])
@@ -36,8 +42,9 @@ mcp = MCPServer(
     "AEGIS Local Guardian",
     instructions=(
         "Local-first AEGIS diagnostics. Read status, local AI evidence, "
-        "model scores and learning decisions. Repair cycles are limited "
-        "to the allowlist implemented by aegis_guardian_cycle.py."
+        "model scores, learning decisions, and signed project continuity state. "
+        "Channel handoffs preserve project/thread/style/pending-action identity. "
+        "Repair cycles are limited to the allowlist implemented by aegis_guardian_cycle.py."
     ),
 )
 
@@ -124,6 +131,22 @@ def cards_resource() -> str:
     return json.dumps(_cards(50), indent=2, ensure_ascii=False)
 
 
+@mcp.resource("aegis://project-context")
+def project_context_resource() -> str:
+    """Signed model-independent AEGIS project/dialog continuity state."""
+    return json.dumps(project_context_impl(), indent=2, ensure_ascii=False)
+
+
+@mcp.resource("aegis://project-context/alexa")
+def alexa_context_resource() -> str:
+    """Alexa/voice rendering packet for the active AEGIS thread."""
+    return json.dumps(
+        project_context_packet_impl("alexa"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -206,6 +229,56 @@ def restore_last_known_good() -> dict:
 def learning_cards(limit: int = 20) -> list[dict]:
     """Return recent local learning cards."""
     return _cards(limit)
+
+
+@mcp.tool()
+def project_context() -> dict:
+    """Return the signed active project/thread/style/pending-action context."""
+    return project_context_impl()
+
+
+@mcp.tool()
+def project_context_packet(channel: str = "chat") -> dict:
+    """Return a channel-specific context packet without changing project state."""
+    return project_context_packet_impl(channel)
+
+
+@mcp.tool()
+def project_continuity_check(
+    project_id: str,
+    thread_id: str,
+    style_fingerprint: str,
+    pending_action: str | None = None,
+) -> dict:
+    """Fail closed if a model/channel has drifted from the active project context."""
+    return project_continuity_check_impl(
+        project_id=project_id,
+        thread_id=thread_id,
+        style_hash=style_fingerprint,
+        pending_action=pending_action,
+    )
+
+
+@mcp.tool()
+def record_project_handoff(
+    from_channel: str,
+    to_channel: str,
+    summary: str,
+    pending_action: str,
+    decisions: list[str] | None = None,
+    blockers: list[str] | None = None,
+    actor: str = "mcp",
+) -> dict:
+    """Record a bounded structured channel/model handoff; no full transcript is stored."""
+    return record_project_handoff_impl(
+        from_channel=from_channel,
+        to_channel=to_channel,
+        summary=summary,
+        pending_action=pending_action,
+        decisions=decisions,
+        blockers=blockers,
+        actor=actor,
+    )
 
 
 @mcp.tool()
