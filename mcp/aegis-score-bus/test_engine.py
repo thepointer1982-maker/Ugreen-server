@@ -239,5 +239,43 @@ class ScoreEngineTests(unittest.TestCase):
         self.assertEqual(out["conflict_count"], 0)
 
 
+    def test_sidecar_export_session_requires_file_hash_binding(self):
+        p = self.write_json("scores/latest.json", {
+            "generated_at": NOW,
+            "evidence_class": "VERIFIED_EXPORT",
+            "network_score": 77,
+            "devices": [],
+        })
+        digest = hashlib.sha256(p.read_bytes()).hexdigest()
+        self.write_manifest([p])
+        self.write_json("scores/export-session.json", {
+            "session_id": "sidecar-1",
+            "artifacts": [{"path": "scores/latest.json", "sha256": digest}],
+        })
+        out = self.engine().scan()
+        rec = next(r for r in out["records"] if r["name"] == "network_score")
+        self.assertEqual(rec["export_session"], "sidecar-1")
+        self.assertEqual(rec["evidence_class"], "VERIFIED_EXPORT")
+        self.assertTrue(rec["provenance_verified"])
+
+    def test_unbound_sidecar_export_session_is_not_accepted(self):
+        p = self.write_json("scores/latest.json", {
+            "generated_at": NOW,
+            "evidence_class": "VERIFIED_EXPORT",
+            "network_score": 77,
+            "devices": [],
+        })
+        self.write_manifest([p])
+        self.write_json("scores/export-session.json", {
+            "session_id": "sidecar-1",
+            "artifacts": [{"path": "scores/latest.json", "sha256": "0" * 64}],
+        })
+        out = self.engine().scan()
+        rec = next(r for r in out["records"] if r["name"] == "network_score")
+        self.assertIsNone(rec["export_session"])
+        self.assertEqual(rec["evidence_class"], "UNKNOWN")
+        self.assertFalse(rec["provenance_verified"])
+
+
 if __name__ == "__main__":
     unittest.main()
