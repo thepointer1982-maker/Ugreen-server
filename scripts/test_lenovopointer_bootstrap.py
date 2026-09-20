@@ -11,6 +11,8 @@ def main():
     assert "Install-LenovoPointerBlackScreenWatch.ps1" in s
     assert "Collect-LenovoPointerBlackScreen.ps1" in s
     assert "Recover-LenovoPointerBlackScreen.ps1" in s
+    assert "-DelaySeconds 0" in s
+    assert "immediate_recovery" in s
     assert "Repair-LenovoPointerBlackScreen.ps1" in s
     assert "Invoke-WebRequest" in s
     assert "forbidden token" in s
