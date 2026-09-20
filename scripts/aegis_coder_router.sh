@@ -11,7 +11,8 @@ STATE_ROOT="${AEGIS_CODER_STATE_ROOT:-$HOME/.local/state/aegis-coder}"
 WORK_ROOT="${AEGIS_CODER_WORK_ROOT:-$HOME/.local/share/aegis-coder/worktrees}"
 LOCAL_MODEL="${AEGIS_LOCAL_CODER_MODEL:-qwen2.5-coder:7b}"
 CONFIG="$REPO_ROOT/config/opencode/aegis-local.json"
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+BOOT_STATE="${AEGIS_CODER_BOOT_STATE_FILE:-$HOME/.local/state/aegis-coder-boot/status.json}"
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$"
 WORKTREE="$WORK_ROOT/$STAMP"
 REPORT="$STATE_ROOT/$STAMP"
 
@@ -35,14 +36,51 @@ local_ready() {
 
 codex_ready() {
   command -v codex >/dev/null 2>&1 || return 1
-  local status
-  status="$(codex login status 2>&1 || true)"
+  local status rc
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    status="$(timeout 15s codex login status 2>&1)"
+    rc=$?
+  else
+    status="$(codex login status 2>&1)"
+    rc=$?
+  fi
+  set -e
+  [[ "$rc" -eq 0 ]] || return 1
   grep -Fq "Logged in using ChatGPT" <<<"$status"
+}
+
+boot_selected() {
+  [[ -s "$BOOT_STATE" ]] || return 1
+  python3 - "$BOOT_STATE" <<'PY'
+import json, sys
+from pathlib import Path
+try:
+    d = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    selected = d.get("selected")
+    health = d.get("health")
+    if selected in {"local","codex"} and health in {"healthy","degraded"}:
+        print(selected)
+except Exception:
+    pass
+PY
 }
 
 case "$MODE" in
   auto)
-    if local_ready; then MODE="local"; elif codex_ready; then MODE="codex"; else echo "blocked: neither local OpenCode/Ollama nor Codex CLI is ready" >&2; exit 5; fi
+    preferred="$(boot_selected || true)"
+    if [[ "$preferred" == "codex" ]] && codex_ready; then
+      MODE="codex"
+    elif [[ "$preferred" == "local" ]] && local_ready; then
+      MODE="local"
+    elif local_ready; then
+      MODE="local"
+    elif codex_ready; then
+      MODE="codex"
+    else
+      echo "blocked: neither local OpenCode/Ollama nor ChatGPT-authenticated Codex CLI is ready" >&2
+      exit 5
+    fi
     ;;
   local) local_ready || { echo "blocked: OpenCode/Ollama local stack not ready" >&2; exit 5; } ;;
   codex) codex_ready || { echo "blocked: Codex CLI must be logged in using ChatGPT; API-key auth is not allowed in zero-extra-cost mode" >&2; exit 5; } ;;
@@ -50,6 +88,7 @@ case "$MODE" in
 esac
 
 echo "mode=$MODE" | tee "$REPORT/meta.txt"
+echo "boot_state=$BOOT_STATE" | tee -a "$REPORT/meta.txt"
 echo "worktree=$WORKTREE" | tee -a "$REPORT/meta.txt"
 
 set +e
