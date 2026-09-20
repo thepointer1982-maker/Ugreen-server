@@ -95,6 +95,18 @@ def main() -> None:
         ok, reason = mod.verify_provenance(blocked)
         assert ok, reason
 
+    installer = ROOT / "scripts" / "aegis_docker_efficiency_install.sh"
+    install_text = installer.read_text(encoding="utf-8")
+    assert "OnBootSec=25s" in install_text
+    assert "OnUnitActiveSec=2min" in install_text
+    assert "AEGIS_DOCKER_FULL_INSPECT_SECONDS=900" in install_text
+    assert "NoNewPrivileges=true" in install_text
+    assert "ProtectSystem=full" in install_text
+    assert "ReadWritePaths=$STATE_DIR" in install_text
+    assert "docker pull" not in install_text
+    assert "docker restart" not in install_text
+    assert "docker system prune" not in install_text
+
     source = SCRIPT.read_text(encoding="utf-8")
     forbidden = [
         "docker pull",
