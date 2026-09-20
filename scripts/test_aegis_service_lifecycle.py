@@ -55,6 +55,7 @@ def main() -> None:
     assert coverage["deepseek-explicit-route"] == "implemented-conditional"
     assert coverage["astra-explicit-route"] == "not-local-core"
     assert coverage["mac-worker-wol"] == "implemented-unconfigured"
+    assert coverage["offline-source-escrow"] == "implemented"
     assert coverage["windows-worker"] == "not-in-clean-branch"
 
     original_command_version = mod.command_version
