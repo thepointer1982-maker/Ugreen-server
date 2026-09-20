@@ -1,0 +1,36 @@
+# AEGIS local secrets and runtime state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+*.secret
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials.json
+credentials.*.json
+secrets.json
+secrets.*.json
+secrets.yml
+secrets.yaml
+
+# Local state / logs / caches
+.aegis-local/
+.local-state/
+state/
+logs/
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.DS_Store
+
+# Docker-local state
+deploy/tailscale/state/
