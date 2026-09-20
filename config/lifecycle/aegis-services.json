@@ -127,6 +127,13 @@
         "--version"
       ],
       "required": true
+    },
+    {
+      "id": "voice-bridge",
+      "class": "optional-local",
+      "kind": "systemd-user",
+      "unit": "aegis-voice-bridge.service",
+      "required": false
     }
   ],
   "integration_coverage": [
@@ -140,18 +147,22 @@
     },
     {
       "id": "alexa-voice-context",
-      "status": "context-only",
+      "status": "local-bridge-ready",
       "evidence": [
-        "scripts/aegis_project_context.py"
+        "scripts/aegis_project_context.py",
+        "scripts/aegis_voice_bridge.py",
+        "scripts/aegis_voice_bridge_install.sh"
       ],
-      "note": "Project/style continuity exists; no dedicated live Alexa transport service is in this clean branch."
+      "note": "Local Unix-socket bridge is implemented. Alexa cloud transport remains optional/external and is not part of the production core."
     },
     {
       "id": "opencode-local",
-      "status": "conditional",
+      "status": "guarded-modern-conditional",
       "evidence": [
         "config/opencode/aegis-local.json",
-        "scripts/aegis_coder_router.sh"
+        "scripts/aegis_coder_router.sh",
+        "scripts/aegis_opencode_guard.py",
+        "scripts/aegis_opencode_install.sh"
       ]
     },
     {
@@ -164,9 +175,13 @@
     },
     {
       "id": "deepseek-explicit-route",
-      "status": "not-explicit",
-      "evidence": [],
-      "note": "Can be added as a local Ollama model candidate, but no dedicated route is currently defined."
+      "status": "implemented-conditional",
+      "evidence": [
+        "config/models/aegis-local-models.json",
+        "scripts/aegis_local_model_select.py",
+        "scripts/aegis_coder_router.sh"
+      ],
+      "note": "DeepSeek R1 8B is selected for reasoning/debug only when already installed locally; no automatic optional-model download."
     },
     {
       "id": "astra-explicit-route",
@@ -176,8 +191,12 @@
     },
     {
       "id": "mac-worker-wol",
-      "status": "not-in-clean-branch",
-      "evidence": []
+      "status": "implemented-unconfigured",
+      "evidence": [
+        "config/workers/aegis-workers.json",
+        "scripts/aegis_worker_control.py"
+      ],
+      "note": "Fail-closed until the real LAN MAC is measured and explicitly enabled."
     },
     {
       "id": "windows-worker",
