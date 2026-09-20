@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "6fe8a6d33f35162b6a19cf68e49f263d84f445f8",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/6fe8a6d33f35162b6a19cf68e49f263d84f445f8/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/6fe8a6d33f35162b6a19cf68e49f263d84f445f8/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/6fe8a6d33f35162b6a19cf68e49f263d84f445f8/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 17,
+  "trusted_sha": "a2846ef611a20b6bc69cf9522cec6256a3801d3b",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/a2846ef611a20b6bc69cf9522cec6256a3801d3b/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/a2846ef611a20b6bc69cf9522cec6256a3801d3b/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/a2846ef611a20b6bc69cf9522cec6256a3801d3b/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 18,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "Adds incremental read-only Docker efficiency guardian for all local containers: 2min fast checks, 15min full inspect cadence, compose validation only on change, no pull/prune/restart/registry query in steady-state, signed real-status integration."
+  "notes": "Security-hardened AEGIS core: incremental Docker guardian, secret guard, local-secret gitignore, least-privilege GitHub Actions, persistent MCP, Local Codex/Ollama, zero-cloud default, signed project continuity."
 }
