@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $UserTaskName = "AEGIS-LenovoPointer-BlackScreenWatch"
 $RecoveryTaskName = "AEGIS-LenovoPointer-BlackScreenRecovery"
+$SupervisorTaskName = "AEGIS-LenovoPointer-BlackScreenSupervisor"
 $BootTaskName = "AEGIS-LenovoPointer-BlackScreenBootWatch"
 $UserRoot = Join-Path $env:LOCALAPPDATA "AEGIS\LenovoPointer\BlackScreen"
 $UserBin = Join-Path $UserRoot "bin"
@@ -15,10 +16,14 @@ $BootBin = Join-Path $BootRoot "bin"
 $CollectorSrc = Join-Path $PSScriptRoot "Collect-LenovoPointerBlackScreen.ps1"
 $WatchSrc = Join-Path $PSScriptRoot "Watch-LenovoPointerBlackScreen.ps1"
 $RecoverySrc = Join-Path $PSScriptRoot "Recover-LenovoPointerBlackScreen.ps1"
+$ResolverSrc = Join-Path $PSScriptRoot "Resolve-LenovoPointerBlackScreen.ps1"
+$SupervisorSrc = Join-Path $PSScriptRoot "Supervise-LenovoPointerBlackScreen.ps1"
 $BootWatchSrc = Join-Path $PSScriptRoot "Watch-LenovoPointerBlackScreenBoot.ps1"
 $CollectorDst = Join-Path $UserBin "Collect-LenovoPointerBlackScreen.ps1"
 $WatchDst = Join-Path $UserBin "Watch-LenovoPointerBlackScreen.ps1"
 $RecoveryDst = Join-Path $UserBin "Recover-LenovoPointerBlackScreen.ps1"
+$ResolverDst = Join-Path $UserBin "Resolve-LenovoPointerBlackScreen.ps1"
+$SupervisorDst = Join-Path $UserBin "Supervise-LenovoPointerBlackScreen.ps1"
 $BootCollectorDst = Join-Path $BootBin "Collect-LenovoPointerBlackScreen.ps1"
 $BootWatchDst = Join-Path $BootBin "Watch-LenovoPointerBlackScreenBoot.ps1"
 
@@ -51,6 +56,7 @@ function Show-Status {
     admin = (Test-Admin)
     user_task = Get-TaskState $UserTaskName
     recovery_task = Get-TaskState $RecoveryTaskName
+    supervisor_task = Get-TaskState $SupervisorTaskName
     boot_task = Get-TaskState $BootTaskName
     user_evidence_root = $UserRoot
     boot_evidence_root = $BootRoot
@@ -58,13 +64,15 @@ function Show-Status {
 }
 
 function Install-UserWatch {
-  foreach ($path in @($CollectorSrc,$WatchSrc,$RecoverySrc)) {
+  foreach ($path in @($CollectorSrc,$WatchSrc,$RecoverySrc,$ResolverSrc,$SupervisorSrc)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Required file missing: $path" }
   }
   New-Item -ItemType Directory -Path $UserBin -Force | Out-Null
   Copy-Item -LiteralPath $CollectorSrc -Destination $CollectorDst -Force
   Copy-Item -LiteralPath $WatchSrc -Destination $WatchDst -Force
   Copy-Item -LiteralPath $RecoverySrc -Destination $RecoveryDst -Force
+  Copy-Item -LiteralPath $ResolverSrc -Destination $ResolverDst -Force
+  Copy-Item -LiteralPath $SupervisorSrc -Destination $SupervisorDst -Force
 
   $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
   $quoted = "`"$WatchDst`""
@@ -77,6 +85,11 @@ function Install-UserWatch {
   $recoveryArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$RecoveryDst`" -DelaySeconds 20 -CollectorPath `"$CollectorDst`" -OutputRoot `"$UserRoot`""
   $recoveryAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $recoveryArgs
   Register-ScheduledTask -TaskName $RecoveryTaskName -Action $recoveryAction -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+
+  $supervisorArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SupervisorDst`" -Cycles 6 -InitialDelaySeconds 45 -IntervalSeconds 60 -CollectorPath `"$CollectorDst`" -ResolverPath `"$ResolverDst`" -Root `"$UserRoot`""
+  $supervisorAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $supervisorArgs
+  $supervisorSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $SupervisorTaskName -Action $supervisorAction -Trigger $trigger -Settings $supervisorSettings -Principal $principal -Force | Out-Null
 }
 
 function Protect-BootRoot {
@@ -106,6 +119,7 @@ function Install-BootWatch {
 function Remove-UserWatch {
   Unregister-ScheduledTask -TaskName $UserTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $RecoveryTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $SupervisorTaskName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
 function Remove-BootWatch {
