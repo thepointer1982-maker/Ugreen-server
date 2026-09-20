@@ -78,7 +78,7 @@ codex_cloud_ready() {
   local status rc
   set +e
   if command -v timeout >/dev/null 2>&1; then
-    status="$(timeout 15s codex login status 2>&1)"
+    status="$(timeout 8s codex login status 2>&1)"
     rc=$?
   else
     status="$(codex login status 2>&1)"
