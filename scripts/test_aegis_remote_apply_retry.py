@@ -16,6 +16,12 @@ def main() -> None:
     )
     assert help_run.returncode == 0
     assert "No passwords are read or stored" in help_run.stdout
+    assert "--no-full-bootstrap" in help_run.stdout
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert 'FULL_BOOTSTRAP="${AEGIS_REMOTE_FULL_BOOTSTRAP:-1}"' in source
+    assert 'AEGIS_TRUSTED_SHA="$TRUSTED_SHA"' in source
+    assert "AEGIS_BOOTSTRAP_FROM_PULL_CONTROL=1" in source
+    assert 'AEGIS_DEST="$PRIMARY_REPO"' in source
 
     bad = subprocess.run(
         ["bash", str(SCRIPT), "--attempts", "0"],
@@ -55,7 +61,7 @@ def main() -> None:
         env["AEGIS_REMOTE_BASE_DELAY"] = "0"
         env["AEGIS_REMOTE_MAX_DELAY"] = "0"
         run = subprocess.run(
-            ["bash", str(SCRIPT), "--repo-root", str(repo), "--attempts", "3"],
+            ["bash", str(SCRIPT), "--repo-root", str(repo), "--attempts", "3", "--no-full-bootstrap"],
             text=True,
             capture_output=True,
             env=env,
