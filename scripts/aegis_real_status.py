@@ -131,11 +131,18 @@ def build_status(repo: Path) -> dict[str, Any]:
     ai_dir = Path(os.environ.get("AEGIS_AI_MINER_STATE_DIR", home_state / "aegis-ai-miner"))
     guardian_dir = Path(os.environ.get("AEGIS_GUARDIAN_STATE_DIR", home_state / "aegis-guardian"))
     scheduler_dir = Path(os.environ.get("AEGIS_SCHEDULER_STATE_DIR", home_state / "aegis-scheduler"))
+    coder_boot_file = Path(
+        os.environ.get(
+            "AEGIS_CODER_BOOT_STATE_FILE",
+            home_state / "aegis-coder-boot" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
     guardian = read_json(guardian_dir / "status.json")
     scheduler = {}
+    coder_boot = read_json(coder_boot_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -178,6 +185,26 @@ def build_status(repo: Path) -> dict[str, Any]:
             health = "degraded" if health == "healthy" else health
             blockers.append(f"timer-{timer.get('ActiveState')}")
 
+    coder_capability = "unknown"
+    coder_selected = None
+    coder_reason = "coder-boot-state-missing"
+    if coder_boot:
+        coder_selected = coder_boot.get("selected")
+        coder_reason = coder_boot.get("reason")
+        boot_health = coder_boot.get("health")
+        if boot_health == "healthy":
+            coder_capability = "ready"
+        elif boot_health == "degraded":
+            coder_capability = "fallback-ready"
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("coder-preferred-backend-unavailable")
+        else:
+            coder_capability = "blocked"
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("coder-backends-unavailable")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -215,6 +242,12 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "models": ollama.get("models", []),
                 "error": ollama.get("error"),
             },
+            "coder": {
+                "capability": coder_capability,
+                "selected": coder_selected,
+                "reason": coder_reason,
+                "boot_state": coder_boot,
+            },
             "learning": {
                 "last_known_good": lkg.get("status"),
                 "provisional": provisional.get("status"),
@@ -228,6 +261,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "model_matrix": file_state(ai_dir / "model-agent-matrix.json", verify=True),
                 "guardian": file_state(guardian_dir / "status.json"),
                 "scheduler_state": file_state(env_path),
+                "coder_boot": file_state(coder_boot_file),
             },
         },
         kind="real-status",
