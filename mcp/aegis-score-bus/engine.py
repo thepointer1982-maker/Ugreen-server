@@ -237,6 +237,55 @@ def _extract_export_session(obj: Any) -> str | None:
     return None
 
 
+def _session_references_file(obj: Any, filename: str, file_hash: str) -> bool:
+    if isinstance(obj, dict):
+        path_value = None
+        hash_value = None
+        for key in ("path", "file", "filename", "artifact", "name"):
+            value = obj.get(key)
+            if isinstance(value, str):
+                path_value = value
+                break
+        for key in ("sha256", "hash", "file_sha256", "artifact_sha256"):
+            value = obj.get(key)
+            if isinstance(value, str):
+                hash_value = value.lower().removeprefix("sha256:")
+                break
+        if path_value and hash_value:
+            if Path(path_value).name == filename and hash_value == file_hash.lower():
+                return True
+        return any(
+            _session_references_file(value, filename, file_hash)
+            for value in obj.values()
+        )
+    if isinstance(obj, list):
+        return any(_session_references_file(value, filename, file_hash) for value in obj)
+    return False
+
+
+def _verified_export_session(path: Path, root_obj: Any, file_hash: str) -> str | None:
+    embedded = _extract_export_session(root_obj)
+    if embedded:
+        return embedded
+    sidecar = path.parent / "export-session.json"
+    if path.name == "export-session.json" or not sidecar.is_file():
+        return None
+    try:
+        session_obj = _load_json(sidecar)
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        return None
+    session = _extract_export_session(session_obj)
+    if not session and isinstance(session_obj, dict):
+        for key in ("id", "session"):
+            value = session_obj.get(key)
+            if isinstance(value, str) and value.strip():
+                session = value.strip()
+                break
+    if session and _session_references_file(session_obj, path.name, file_hash):
+        return session
+    return None
+
+
 def _freshness(observed: datetime | None, max_age_hours: int) -> str:
     if observed is None:
         return "UNKNOWN"
@@ -470,7 +519,7 @@ class ScoreEngine:
                 continue
             observed = _extract_times(doc)
             commit = _extract_commit(doc) or _repo_head(root)
-            export_session = _extract_export_session(doc)
+            export_session = _verified_export_session(path, doc, file_hash)
             evidence = _classify(path, doc, hash_verified, export_session)
             freshness = _freshness(observed, self.max_age_hours)
             provenance_verified = bool(
