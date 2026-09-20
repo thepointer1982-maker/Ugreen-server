@@ -451,10 +451,12 @@ class ScoreEngine:
         records = all_records if include_unchanged else [r for r in all_records if r.changed]
         alerts = [
             r for r in records
-            if r.warning and any(x in r.warning for x in (
+            if r.warning
+            and any(x in r.warning for x in (
                 "REGRESSION", "UNEXPECTED_JUMP", "HASH_MISMATCH",
                 "GATE_OR_HEALTH_ALERT", "FUTURE_TIMESTAMP"
             ))
+            and (r.evidence_class in REAL_EVIDENCE or r.hash_verified is False)
         ]
         real_changes = [r for r in records if r.counts_as_real_improvement]
         return {
