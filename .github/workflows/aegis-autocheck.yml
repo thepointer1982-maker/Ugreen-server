@@ -34,6 +34,13 @@ on:
       - 'scripts/aegis_iphone_ashell_bootstrap.sh'
       - 'scripts/test_aegis_shortcuts_remote_launcher.py'
       - 'scripts/aegis_shortcuts_remote_launcher.sh'
+      - 'scripts/test_lenovopointer_black_screen.py'
+      - 'windows/Repair-LenovoPointerBlackScreen.ps1'
+      - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
+      - 'windows/Watch-LenovoPointerBlackScreen.ps1'
+      - 'windows/Collect-LenovoPointerBlackScreen.ps1'
+      - 'docs/lenovopointer-black-screen.md'
+      - 'incidents/lenovopointer-windows11-black-screen.json'
       - 'scripts/test_aegis_bootstrap_from_github.py'
       - 'scripts/aegis_bootstrap_from_github.sh'
       - '.github/workflows/aegis-nas-control.yml'
@@ -94,6 +101,13 @@ on:
       - 'scripts/aegis_iphone_ashell_bootstrap.sh'
       - 'scripts/test_aegis_shortcuts_remote_launcher.py'
       - 'scripts/aegis_shortcuts_remote_launcher.sh'
+      - 'scripts/test_lenovopointer_black_screen.py'
+      - 'windows/Repair-LenovoPointerBlackScreen.ps1'
+      - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
+      - 'windows/Watch-LenovoPointerBlackScreen.ps1'
+      - 'windows/Collect-LenovoPointerBlackScreen.ps1'
+      - 'docs/lenovopointer-black-screen.md'
+      - 'incidents/lenovopointer-windows11-black-screen.json'
       - 'scripts/test_aegis_bootstrap_from_github.py'
       - 'scripts/aegis_bootstrap_from_github.sh'
       - 'scripts/test_aegis_access_bootstrap.py'
@@ -169,6 +183,32 @@ jobs:
       - name: Run AEGIS native Shortcuts launcher regression tests
         run: python3 scripts/test_aegis_shortcuts_remote_launcher.py
 
+      - name: Run LenovoPointer black-screen regression tests
+        run: python3 scripts/test_lenovopointer_black_screen.py
+
+      - name: Parse LenovoPointer PowerShell scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $files = @(
+            "windows/Collect-LenovoPointerBlackScreen.ps1",
+            "windows/Watch-LenovoPointerBlackScreen.ps1",
+            "windows/Install-LenovoPointerBlackScreenWatch.ps1",
+            "windows/Repair-LenovoPointerBlackScreen.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Format-List | Out-String | Write-Error
+            }
+          }
+
       - name: Run AEGIS coder-router regression tests
         run: python3 scripts/test_aegis_coder_router.py
 
@@ -197,7 +237,7 @@ jobs:
         run: python3 scripts/test_aegis_learning_gate.py
 
       - name: Compile guardian, deploy, retry, runner, tunnel, access, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_aegis_coder_router.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_lenovopointer_black_screen.py scripts/test_aegis_coder_router.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
