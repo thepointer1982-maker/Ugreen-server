@@ -94,6 +94,20 @@ else
 fi
 echo "codex_oss=$CODEX_OSS_STATUS"
 
+echo "=== AEGIS MODERN OPENCODE FALLBACK ==="
+OPENCODE_STATUS="skipped"
+set +e
+AEGIS_ALLOW_OPENCODE_INSTALL="${AEGIS_ALLOW_OPENCODE_INSTALL:-0}" \
+bash scripts/aegis_opencode_install.sh
+opencode_rc=$?
+set -e
+if [[ "$opencode_rc" -eq 0 ]]; then
+  OPENCODE_STATUS="checked"
+else
+  OPENCODE_STATUS="failed:$opencode_rc"
+fi
+echo "opencode=$OPENCODE_STATUS"
+
 echo "=== AEGIS CODER BOOT GUARDIAN ==="
 CODER_BOOT_STATUS="skipped"
 if systemctl --user show-environment >/dev/null 2>&1; then
@@ -160,6 +174,36 @@ else
 fi
 echo "lifecycle=$LIFECYCLE_STATUS"
 
+echo "=== AEGIS LAN WORKER FLEET ==="
+WORKER_STATUS="skipped"
+set +e
+python3 scripts/aegis_worker_control.py status >/dev/null
+worker_rc=$?
+set -e
+if [[ "$worker_rc" -eq 0 ]]; then
+  WORKER_STATUS="ready"
+else
+  WORKER_STATUS="failed:$worker_rc"
+fi
+echo "workers=$WORKER_STATUS"
+
+echo "=== AEGIS LOCAL VOICE BRIDGE ==="
+VOICE_STATUS="skipped"
+if systemctl --user show-environment >/dev/null 2>&1; then
+  set +e
+  bash scripts/aegis_voice_bridge_install.sh
+  voice_rc=$?
+  set -e
+  if [[ "$voice_rc" -eq 0 ]]; then
+    VOICE_STATUS="active"
+  else
+    VOICE_STATUS="failed:$voice_rc"
+  fi
+else
+  VOICE_STATUS="user-systemd-unavailable"
+fi
+echo "voice_bridge=$VOICE_STATUS"
+
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
 set +e
@@ -202,8 +246,11 @@ echo "AEGIS zero-cost pull control active."
 echo "user_persistence=$PERSISTENCE_STATUS"
 echo "mcp_runtime=$MCP_STATUS"
 echo "codex_oss=$CODEX_OSS_STATUS"
+echo "opencode=$OPENCODE_STATUS"
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 echo "autonomy=$AUTONOMY_STATUS"
 echo "lifecycle=$LIFECYCLE_STATUS"
+echo "workers=$WORKER_STATUS"
+echo "voice_bridge=$VOICE_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
