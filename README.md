@@ -102,4 +102,4 @@ Das Toolkit ist für Linux-basierte UGREEN NAS-/Server-Systeme gedacht, auf dene
 
 ## AEGIS Score Evidence MCP
 
-A local, read-only MCP bridge for verified AEGIS score evidence is available under [`mcp/aegis_score_mcp`](mcp/aegis_score_mcp/README.md). It separates real device measurements and verified exports from fixtures, synthetic values, heuristics, targets, templates and archive claims; verifies freshness/hash/export-session evidence where available; and maintains a sanitized local comparison baseline without changing devices, router settings, firmware, accounts or raw logs.
+A local, read-only MCP bridge for verified AEGIS score evidence is available under [`mcp/aegis-score-bus`](mcp/aegis-score-bus/README.md). It separates real device measurements and verified exports from fixtures, synthetic values, heuristics, targets, templates and archive claims; verifies freshness/hash/export-session evidence where available; and maintains a sanitized local comparison baseline without changing devices, router settings, firmware, accounts or raw logs.
