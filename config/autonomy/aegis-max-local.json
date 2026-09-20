@@ -79,5 +79,18 @@
     "failed_validation_requires_rollback_or_block": true,
     "provenance_required": true,
     "no_silent_context_reset": true
+  },
+  "privacy": {
+    "profile": "privacy-first-zero-cost",
+    "github_runtime_data_upload": false,
+    "github_model_upload": false,
+    "github_voice_content_upload": false,
+    "github_log_upload": false,
+    "github_secret_upload": false,
+    "github_hosted_ci_when_private": false,
+    "self_hosted_ci_when_private": true,
+    "tailscale_default_enabled": false,
+    "alexa_cloud_in_production_core": false,
+    "external_telemetry_default_enabled": false
   }
 }
