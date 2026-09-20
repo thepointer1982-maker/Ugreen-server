@@ -72,6 +72,33 @@ def load_json(path: Path) -> dict[str, Any]:
         return {}
 
 
+def bootstrap_source_root(repo: Path) -> str | None:
+    raw_state = os.environ.get("AEGIS_STATE_DIR")
+    if raw_state:
+        report = Path(raw_state).expanduser() / "preflight.json"
+    else:
+        base = Path(
+            os.environ.get(
+                "XDG_STATE_HOME",
+                Path.home() / ".local/state",
+            )
+        )
+        report = base / "aegis-bootstrap" / "preflight.json"
+
+    data = load_json(report)
+    source = data.get("source") if isinstance(data, dict) else None
+    if (
+        data.get("status") == "ready"
+        and data.get("repo_root") == str(repo.resolve())
+        and isinstance(source, dict)
+        and source.get("status") == "ready"
+        and isinstance(source.get("root"), str)
+        and source.get("root")
+    ):
+        return str(source["root"])
+    return None
+
+
 def select_database_sources(report: dict[str, Any]) -> dict[str, str | None]:
     inventory = report.get("inventory")
     dbs = inventory.get("sqlite_databases", []) if isinstance(inventory, dict) else []
@@ -162,10 +189,20 @@ def main() -> int:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 20
 
+    source_root = bootstrap_source_root(repo)
+    result["source_reuse"] = {
+        "root": source_root,
+        "used_for_export": bool(source_root),
+    }
+
     nas_cmd = ["bash", "scripts/aegis_nas_run_once.sh", "--repo-root", str(repo)]
     if args.push:
         nas_cmd.append("--push")
-    nas_run = run_step(nas_cmd, repo)
+    nas_run = run_step(
+        nas_cmd,
+        repo,
+        extra_env={"AEGIS_SOURCE_ROOT": source_root} if source_root else None,
+    )
     result["steps"]["nas_run"] = nas_run
     if nas_run["rc"] != 0:
         result["status"] = "blocked"
