@@ -61,6 +61,19 @@ echo "user_persistence=$PERSISTENCE_STATUS"
 echo "=== AEGIS PRIMARY ZERO-COST CONTROL ==="
 bash scripts/aegis_pull_control_install.sh
 
+echo "=== AEGIS LOCAL MCP RUNTIME ==="
+MCP_STATUS="skipped"
+set +e
+AEGIS_ALLOW_MCP_INSTALL="${AEGIS_ALLOW_MCP_INSTALL:-1}" bash scripts/aegis_mcp_runtime_install.sh
+mcp_rc=$?
+set -e
+if [[ "$mcp_rc" -eq 0 ]]; then
+  MCP_STATUS="ready"
+else
+  MCP_STATUS="failed:$mcp_rc"
+fi
+echo "mcp_runtime=$MCP_STATUS"
+
 echo "=== AEGIS LOCAL CODEX OSS ==="
 CODEX_OSS_STATUS="skipped"
 set +e
@@ -95,19 +108,14 @@ echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
-if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
-  echo "github_cli_auth=ready"
-  set +e
-  bash scripts/aegis_access_bootstrap.sh runner
-  runner_rc=$?
-  set -e
-  if [[ "$runner_rc" -eq 0 ]]; then
-    RUNNER_STATUS="active"
-  else
-    RUNNER_STATUS="failed:$runner_rc"
-  fi
+set +e
+bash scripts/aegis_runner_install.sh
+runner_rc=$?
+set -e
+if [[ "$runner_rc" -eq 0 ]]; then
+  RUNNER_STATUS="active"
 else
-  echo "github_cli_auth=unavailable"
+  RUNNER_STATUS="failed:$runner_rc"
 fi
 echo "runner_return_channel=$RUNNER_STATUS"
 
@@ -133,6 +141,7 @@ fi
 
 echo "AEGIS zero-cost pull control active."
 echo "user_persistence=$PERSISTENCE_STATUS"
+echo "mcp_runtime=$MCP_STATUS"
 echo "codex_oss=$CODEX_OSS_STATUS"
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
