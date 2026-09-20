@@ -3,6 +3,7 @@ set -euo pipefail
 
 RUNNER_VERSION="${AEGIS_RUNNER_VERSION:-2.337.0}"
 RUNNER_URL="${AEGIS_RUNNER_URL:-https://github.com/thepointer1982-maker/Ugreen-server}"
+RUNNER_REPO="${AEGIS_RUNNER_REPO:-thepointer1982-maker/Ugreen-server}"
 RUNNER_TOKEN="${AEGIS_RUNNER_TOKEN:-}"
 RUNNER_NAME="${AEGIS_RUNNER_NAME:-aegis-ugreen-v2}"
 RUNNER_LABELS="${AEGIS_RUNNER_LABELS:-aegis-ugreen-v2}"
@@ -11,19 +12,20 @@ RUNTIME_ROOT="${AEGIS_RUNTIME_ROOT:-$HOME/aegis-runtime}"
 
 usage() {
   cat <<'EOF'
-Usage: AEGIS_RUNNER_TOKEN=... bash scripts/aegis_runner_install.sh
+Usage: bash scripts/aegis_runner_install.sh
 
-Installs the repository-scoped AEGIS UGREEN self-hosted runner.
+Token discovery order:
+1. AEGIS_RUNNER_TOKEN from the current shell
+2. existing authenticated GitHub CLI session via gh api
 
 Security:
-- registration token is read only from AEGIS_RUNNER_TOKEN
-- token is never written to the repository
+- short-lived registration token is held only in process memory
+- token is never printed or written to the repository
+- persistent GitHub CLI credentials are never read by this script
 - runner receives versioned label aegis-ugreen-v2
 - old queued aegis-ugreen jobs cannot match this runner
 - runtime code is checked out into ~/aegis-runtime/Ugreen-server
-- control workflow accepts only owner pushes and an allowlisted action
 - control request must include a tested trusted_sha
-- do not register this runner for public PR workflows
 EOF
 }
 
@@ -32,10 +34,35 @@ if [[ "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-[[ -n "$RUNNER_TOKEN" ]] || {
-  echo "AEGIS_RUNNER_TOKEN missing" >&2
+TOKEN_SOURCE="environment"
+if [[ -z "$RUNNER_TOKEN" ]]; then
+  TOKEN_SOURCE="none"
+  if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
+    set +e
+    RUNNER_TOKEN="$(gh api \
+      --method POST \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "repos/$RUNNER_REPO/actions/runners/registration-token" \
+      --jq '.token' 2>/dev/null)
+    gh_rc=$?
+    set -e
+    if [[ "$gh_rc" -eq 0 && -n "$RUNNER_TOKEN" ]]; then
+      TOKEN_SOURCE="gh-api"
+    else
+      RUNNER_TOKEN=""
+    fi
+  fi
+fi
+
+if [[ -z "$RUNNER_TOKEN" ]]; then
+  echo "No runner registration token available." >&2
+  echo "Export AEGIS_RUNNER_TOKEN, or authenticate gh with repository Administration write permission." >&2
   exit 4
-}
+fi
+
+trap 'RUNNER_TOKEN=""; unset RUNNER_TOKEN' EXIT
+echo "runner_token_source=$TOKEN_SOURCE"
 
 arch="$(uname -m)"
 case "$arch" in
@@ -78,6 +105,9 @@ fi
   --name "$RUNNER_NAME" \
   --labels "$RUNNER_LABELS" \
   --work "_work"
+
+RUNNER_TOKEN=""
+unset RUNNER_TOKEN
 
 if [[ -x ./svc.sh ]] && command -v sudo >/dev/null; then
   sudo ./svc.sh install "$(id -un)"
