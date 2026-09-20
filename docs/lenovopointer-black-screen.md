@@ -222,3 +222,24 @@ Recovery events are appended locally to:
 ```text
 %LOCALAPPDATA%\AEGIS\LenovoPointer\BlackScreen\recovery-events.jsonl
 ```
+
+
+## Autonomous local repair loop
+
+After bootstrap, three local tasks cooperate without cloud model calls:
+
+1. **Boot watcher** runs as SYSTEM during startup and records pre-login display/Hello/USB evidence.
+2. **Recovery task** runs in the interactive user session about 20 seconds after sign-in and only starts `explorer.exe` if the standard shell is missing.
+3. **Supervisor task** starts after 45 seconds and performs repeated cycles of:
+   `collect -> score -> observe -> safe repair -> collect again -> compare`.
+
+The supervisor has a single-instance guard, PID/start-time/boot validation, a failure circuit breaker, a cooldown period, and before/after shell-health comparison. If recovery is not confirmed or the shell score worsens, it stops further automatic changes and enters cooldown.
+
+Automatic policy is intentionally narrow: only a missing Explorer shell can be changed without an additional local safety gate. Fingerprint/Windows Hello, display drivers, USB-C, Echo/Bluetooth, Fast Startup, firmware and boot settings remain diagnostic or reversible A/B actions requiring the corresponding safety prerequisites.
+
+Local supervisor state:
+
+```text
+%LOCALAPPDATA%\AEGIS\LenovoPointer\BlackScreen\supervisor\state.json
+%LOCALAPPDATA%\AEGIS\LenovoPointer\BlackScreen\supervisor\events.jsonl
+```
