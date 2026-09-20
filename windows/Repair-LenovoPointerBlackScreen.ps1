@@ -57,6 +57,13 @@ if ($Action -eq "Status" -or $Action -eq "PlanEchoIsolation") {
 if ($Action -eq "ApplyEchoIsolation") {
   Require-Admin
   if (-not (Get-Command Disable-PnpDevice -ErrorAction SilentlyContinue)) { throw "Disable-PnpDevice is unavailable." }
+  if (Test-Path -LiteralPath $EchoState) {
+    $existing = Get-Content -LiteralPath $EchoState -Raw | ConvertFrom-Json
+    if ($existing.active -eq $true) {
+      [pscustomobject]@{ status="already-applied"; backup=$EchoState; device_count=@($existing.devices).Count } | ConvertTo-Json
+      exit 0
+    }
+  }
   $devices = @(Get-EchoDevices)
   if ($devices.Count -eq 0) { throw "No Echo-like PnP endpoints were found. Nothing changed." }
   $state = [ordered]@{
@@ -95,6 +102,14 @@ if ($Action -eq "RestoreEcho") {
 if ($Action -eq "DisableFastStartup") {
   Require-Admin
   $path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
+  if (Test-Path -LiteralPath $FastState) {
+    $existing = Get-Content -LiteralPath $FastState -Raw | ConvertFrom-Json
+    if ($existing.active -eq $true) {
+      Set-ItemProperty -Path $path -Name HiberbootEnabled -Type DWord -Value 0
+      [pscustomobject]@{ status="already-disabled"; original=$existing.original_value; backup=$FastState } | ConvertTo-Json
+      exit 0
+    }
+  }
   $current = Get-FastStartupValue
   $state = [ordered]@{
     schema = "aegis-fast-startup/v1"
