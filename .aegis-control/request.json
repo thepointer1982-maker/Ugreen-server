@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 6,
-  "trusted_sha": "e50f8a48e75d25b8d1ef48277d91d64a606d621f",
+  "sequence": 7,
+  "trusted_sha": "bffd6c955dd23f433031a852d92ef2e4d34a5acf",
   "requested_by": "repository-owner",
-  "purpose": "verify-zero-cost-pull-control-and-coder-router"
+  "purpose": "verify-zero-cost-bootstrap-live-status"
 }
