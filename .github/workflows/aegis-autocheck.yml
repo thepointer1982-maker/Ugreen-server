@@ -40,6 +40,7 @@ on:
       - 'windows/Bootstrap-LenovoPointerBlackScreen.ps1'
       - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
       - 'windows/Watch-LenovoPointerBlackScreen.ps1'
+      - 'windows/Watch-LenovoPointerBlackScreenBoot.ps1'
       - 'windows/Collect-LenovoPointerBlackScreen.ps1'
       - 'docs/lenovopointer-black-screen.md'
       - 'incidents/lenovopointer-windows11-black-screen.json'
@@ -109,6 +110,7 @@ on:
       - 'windows/Bootstrap-LenovoPointerBlackScreen.ps1'
       - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
       - 'windows/Watch-LenovoPointerBlackScreen.ps1'
+      - 'windows/Watch-LenovoPointerBlackScreenBoot.ps1'
       - 'windows/Collect-LenovoPointerBlackScreen.ps1'
       - 'docs/lenovopointer-black-screen.md'
       - 'incidents/lenovopointer-windows11-black-screen.json'
@@ -200,6 +202,7 @@ jobs:
           $files = @(
             "windows/Collect-LenovoPointerBlackScreen.ps1",
             "windows/Watch-LenovoPointerBlackScreen.ps1",
+            "windows/Watch-LenovoPointerBlackScreenBoot.ps1",
             "windows/Install-LenovoPointerBlackScreenWatch.ps1",
             "windows/Repair-LenovoPointerBlackScreen.ps1",
             "windows/Bootstrap-LenovoPointerBlackScreen.ps1"
