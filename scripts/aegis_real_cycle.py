@@ -22,15 +22,23 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def run_step(cmd: list[str], cwd: Path, timeout: int = 600) -> dict[str, Any]:
+def run_step(
+    cmd: list[str],
+    cwd: Path,
+    timeout: int = 600,
+    extra_env: dict[str, str] | None = None,
+) -> dict[str, Any]:
     try:
+        env = os.environ.copy()
+        if extra_env:
+            env.update(extra_env)
         proc = subprocess.run(
             cmd,
             cwd=cwd,
             text=True,
             capture_output=True,
             timeout=timeout,
-            env=os.environ.copy(),
+            env=env,
         )
         return {
             "cmd": cmd,
@@ -244,7 +252,11 @@ def main() -> int:
     ]
     if args.repair:
         guardian_cmd.append("--repair")
-    guardian = run_step(guardian_cmd, repo)
+    guardian = run_step(
+        guardian_cmd,
+        repo,
+        extra_env={"AEGIS_GUARDIAN_REUSE_PREFLIGHT": "1"},
+    )
     result["steps"]["guardian"] = guardian
 
     guardian_status = load_json(
