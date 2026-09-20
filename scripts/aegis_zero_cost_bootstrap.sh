@@ -73,7 +73,6 @@ else
   MCP_STATUS="failed:$mcp_rc"
 fi
 echo "mcp_runtime=$MCP_STATUS"
-echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 
 echo "=== AEGIS LOCAL CODEX OSS ==="
 CODEX_OSS_STATUS="skipped"
@@ -122,6 +121,23 @@ if command -v docker >/dev/null 2>&1; then
 fi
 echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 
+echo "=== AEGIS AUTO-MAX-LOCAL AUTONOMY ==="
+AUTONOMY_STATUS="skipped"
+if systemctl --user show-environment >/dev/null 2>&1; then
+  set +e
+  bash scripts/aegis_autonomy_install.sh
+  autonomy_rc=$?
+  set -e
+  if [[ "$autonomy_rc" -eq 0 ]]; then
+    AUTONOMY_STATUS="active"
+  else
+    AUTONOMY_STATUS="failed:$autonomy_rc"
+  fi
+else
+  AUTONOMY_STATUS="user-systemd-unavailable"
+fi
+echo "autonomy=$AUTONOMY_STATUS"
+
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
 set +e
@@ -160,4 +176,6 @@ echo "user_persistence=$PERSISTENCE_STATUS"
 echo "mcp_runtime=$MCP_STATUS"
 echo "codex_oss=$CODEX_OSS_STATUS"
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
+echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
+echo "autonomy=$AUTONOMY_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
