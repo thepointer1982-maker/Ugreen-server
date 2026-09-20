@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "0b4df5ff238bce0be1e5d0bd05f1fb47d12219a1",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0b4df5ff238bce0be1e5d0bd05f1fb47d12219a1/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0b4df5ff238bce0be1e5d0bd05f1fb47d12219a1/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/0b4df5ff238bce0be1e5d0bd05f1fb47d12219a1/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 19,
+  "trusted_sha": "bca7a1ff199bacb7b715b920bc9e9a9661e30c12",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/bca7a1ff199bacb7b715b920bc9e9a9661e30c12/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 20,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "AUTO-MAX-LOCAL: shared autonomy policy across MCP, Local Codex/Ollama, project continuity, Guardian, Docker, timers and local AI task queue. Reversible local actions autonomous; cloud-cost, public exposure, secrets, arbitrary root, destructive storage and unlabeled Docker restart remain blocked."
+  "notes": "Sequence 20 makes outbound pull-control the primary NAS control plane. deploy-retry is backward-compatible with older pull-control, performs a SHA-pinned persistent zero-cost bootstrap, installs AUTO-MAX-LOCAL/MCP/Local Codex/Ollama/Docker guardians and scheduler, avoids recursive pull-control self-start, then validates signed real status. GitHub self-hosted runner is optional fallback."
 }
