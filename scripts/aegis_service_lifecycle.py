@@ -140,10 +140,14 @@ def command_version(command: str, args: list[str]) -> dict[str, Any]:
     }
 
 
-def python_package_version(package: str) -> dict[str, Any]:
+def python_package_version(
+    package: str,
+    python_bin: str | None = None,
+) -> dict[str, Any]:
+    executable = python_bin or sys.executable
     cp = run(
         [
-            sys.executable,
+            executable,
             "-c",
             (
                 "import importlib.metadata as m; "
@@ -263,7 +267,26 @@ def inspect_service(spec: dict[str, Any]) -> dict[str, Any]:
         result["installed"] = runtime.get("installed", False)
         result["version"] = runtime.get("version")
     elif kind == "python-package":
-        runtime = python_package_version(str(spec.get("package") or ""))
+        python_bin = None
+        if spec.get("id") == "mcp-python":
+            mcp_state = read_json(
+                Path.home() / ".local/state/aegis-mcp/runtime.json"
+            )
+            candidate = mcp_state.get("python")
+            if isinstance(candidate, str) and Path(candidate).is_file():
+                python_bin = candidate
+            else:
+                venv_python = (
+                    Path.home()
+                    / ".local/share/aegis-mcp/venv/bin/python"
+                )
+                if venv_python.is_file():
+                    python_bin = str(venv_python)
+        runtime = python_package_version(
+            str(spec.get("package") or ""),
+            python_bin=python_bin,
+        )
+        runtime["python"] = python_bin or sys.executable
         result["runtime"] = runtime
         result["installed"] = runtime.get("installed", False)
         result["version"] = runtime.get("version")
@@ -275,7 +298,30 @@ def inspect_service(spec: dict[str, Any]) -> dict[str, Any]:
     elif kind == "binary":
         command = str(spec.get("command") or "")
         path = shutil.which(command)
-        result["runtime"] = {"installed": bool(path), "path": path}
+        if not path and spec.get("id") == "github-runner":
+            candidate = (
+                Path.home()
+                / "actions-runner-aegis-v2/bin/Runner.Listener"
+            )
+            if candidate.is_file():
+                path = str(candidate)
+        runtime = {
+            "installed": bool(path),
+            "path": path,
+            "version": None,
+        }
+        if path:
+            cp = run([path, "--version"], timeout=10)
+            raw = (cp.stdout or cp.stderr).strip()[-1000:]
+            parsed = version_tuple(raw)
+            runtime["version_raw"] = raw
+            runtime["version"] = (
+                ".".join(map(str, parsed))
+                if parsed
+                else None
+            )
+            result["version"] = runtime["version"]
+        result["runtime"] = runtime
         result["installed"] = bool(path)
     else:
         result["installed"] = False
@@ -368,6 +414,26 @@ def main() -> int:
         if isinstance(spec, dict)
     ]
 
+    stale_after = int(manifest.get("stale_release_after_days") or 365)
+    for service in services:
+        age = service.get("known_release_age_days")
+        if isinstance(age, int) and age > stale_after:
+            if service.get("status") == "healthy":
+                service["status"] = "review"
+            service.setdefault("reasons", []).append(
+                "reviewed-release-baseline-stale"
+            )
+
+    reviewed_at = manifest.get("reviewed_at")
+    manifest_age_days = release_age_days(
+        str(reviewed_at) if reviewed_at else None
+    )
+    review_after = int(manifest.get("baseline_review_after_days") or 60)
+    baseline_stale = (
+        isinstance(manifest_age_days, int)
+        and manifest_age_days > review_after
+    )
+
     blocked = [s["id"] for s in services if s.get("status") == "blocked"]
     legacy = [s["id"] for s in services if s.get("status") == "legacy"]
     review = [
@@ -379,7 +445,7 @@ def main() -> int:
     health = "healthy"
     if blocked:
         health = "blocked"
-    elif legacy or review:
+    elif legacy or review or baseline_stale:
         health = "degraded"
 
     report = attach_provenance(
@@ -393,6 +459,12 @@ def main() -> int:
             "services": services,
             "integration_coverage": integration_coverage(manifest),
             "policy": manifest.get("policy", {}),
+            "baseline": {
+                "reviewed_at": reviewed_at,
+                "age_days": manifest_age_days,
+                "review_after_days": review_after,
+                "stale": baseline_stale,
+            },
             "guardrails": {
                 "read_only": True,
                 "auto_update_external_software": False,
