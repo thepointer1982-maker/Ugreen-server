@@ -17,10 +17,12 @@ $now = Get-Date
 $currentSession = (Get-Process -Id $PID).SessionId
 
 function Write-RecoveryEvent {
-  param([hashtable]$Event)
-  $Event.timestamp = (Get-Date).ToString("o")
-  $Event.session_id = $currentSession
-  ($Event | ConvertTo-Json -Compress -Depth 8) | Add-Content -LiteralPath $logPath -Encoding UTF8
+  param([System.Collections.IDictionary]$Event)
+  $copy = [ordered]@{}
+  foreach ($key in $Event.Keys) { $copy[$key] = $Event[$key] }
+  $copy["timestamp"] = (Get-Date).ToString("o")
+  $copy["session_id"] = $currentSession
+  ($copy | ConvertTo-Json -Compress -Depth 8) | Add-Content -LiteralPath $logPath -Encoding UTF8
 }
 
 # Evidence is collected before any recovery action. Collector failures never trigger
@@ -60,7 +62,7 @@ if ($shell -and $shell -notmatch "(?i)^explorer\.exe$") {
     action = "none"
     safety = "No process was terminated and no registry, driver, biometric, boot, USB, Bluetooth, or network setting was changed."
   }
-  Write-RecoveryEvent @{} + $result
+  Write-RecoveryEvent -Event $result
   $result | ConvertTo-Json -Depth 6
   exit 2
 }
@@ -75,7 +77,7 @@ if ($explorerBefore.Count -gt 0) {
     action = "none"
     safety = "Codex and all existing processes were preserved."
   }
-  Write-RecoveryEvent @{} + $result
+  Write-RecoveryEvent -Event $result
   $result | ConvertTo-Json -Depth 6
   exit 0
 }
@@ -95,7 +97,7 @@ try {
     action = "start-explorer"
     error = $_.Exception.Message
   }
-  Write-RecoveryEvent @{} + $result
+  Write-RecoveryEvent -Event $result
   $result | ConvertTo-Json -Depth 6
   exit 3
 }
@@ -115,6 +117,6 @@ $result = [ordered]@{
   changed_at = (Get-Date).ToString("o")
   safety = "Only explorer.exe was started. Nothing was terminated; Codex, DWM, GPU drivers, Windows Hello, fingerprint, USB, Bluetooth, network, boot and firmware were untouched."
 }
-Write-RecoveryEvent @{} + $result
+Write-RecoveryEvent -Event $result
 $result | ConvertTo-Json -Depth 6
 if ($explorerAfter.Count -gt 0) { exit 0 } else { exit 4 }
