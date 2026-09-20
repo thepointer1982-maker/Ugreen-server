@@ -167,6 +167,12 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-autonomy" / "status.json",
         )
     )
+    pull_control_file = Path(
+        os.environ.get(
+            "AEGIS_PULL_CONTROL_STATE_FILE",
+            home_state / "aegis-pull-control" / "state.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -178,6 +184,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     runner_state = read_json(runner_state_file)
     docker_efficiency = read_json(docker_efficiency_file)
     autonomy = read_json(autonomy_file)
+    pull_control = read_json(pull_control_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -195,6 +202,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     runner_service = systemd_status("aegis-github-runner.service")
     docker_timer = systemd_status("aegis-docker-efficiency.timer")
     autonomy_timer = systemd_status("aegis-autonomy.timer")
+    pull_control_timer = systemd_status("aegis-pull-control.timer")
 
     health = "healthy"
     blockers: list[str] = []
@@ -250,7 +258,42 @@ def build_status(repo: Path) -> dict[str, Any]:
         if health == "healthy":
             health = "degraded"
         blockers.append("mcp-runtime-unhealthy")
-    if runner_state and runner_active is not True:
+    pull_control_ok = False
+    pull_control_reason = "missing"
+    if pull_control:
+        pull_control_ok, pull_control_reason = verify_provenance(pull_control)
+
+    pull_timer_active = (
+        pull_control_timer.get("available")
+        and pull_control_timer.get("LoadState") == "loaded"
+        and pull_control_timer.get("ActiveState") == "active"
+    )
+    primary_control_ready = bool(
+        pull_timer_active
+        and (
+            not pull_control
+            or (
+                pull_control_ok
+                and pull_control.get("transport") == "outbound-pull"
+                and pull_control.get("runner_required") is False
+            )
+        )
+    )
+
+    if pull_control and not pull_control_ok:
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("pull-control-provenance-invalid")
+    if (
+        pull_control_timer.get("available")
+        and pull_control_timer.get("LoadState") == "loaded"
+        and pull_control_timer.get("ActiveState") != "active"
+    ):
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("pull-control-timer-inactive")
+
+    if runner_state and runner_active is not True and not primary_control_ready:
         if health == "healthy":
             health = "degraded"
         blockers.append("runner-service-inactive")
@@ -316,14 +359,35 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "coder_boot_timer": coder_timer,
                 "docker_efficiency_timer": docker_timer,
                 "autonomy_timer": autonomy_timer,
+                "pull_control_timer": pull_control_timer,
             },
             "control": {
+                "primary": {
+                    "transport": "outbound-pull",
+                    "ready": primary_control_ready,
+                    "runner_required": False,
+                },
+                "pull_control": {
+                    "status": pull_control.get("status"),
+                    "transport": pull_control.get("transport"),
+                    "runner_required": pull_control.get("runner_required"),
+                    "last_sequence": pull_control.get("last_sequence"),
+                    "seen_sequence": pull_control.get("seen_sequence"),
+                    "sequence": pull_control.get("sequence"),
+                    "trusted_sha": pull_control.get("trusted_sha"),
+                    "completed_at": pull_control.get("completed_at"),
+                    "last_checked_at": pull_control.get("last_checked_at"),
+                    "provenance_verified": pull_control_ok if pull_control else None,
+                    "provenance_reason": pull_control_reason,
+                    "systemd_timer": pull_control_timer,
+                },
                 "runner": {
                     "configured": runner_state.get("configured"),
                     "service_mode": runner_state.get("service_mode"),
                     "service_active": runner_state.get("service_active"),
                     "runner_name": runner_state.get("runner_name"),
                     "labels": runner_state.get("labels"),
+                    "optional_fallback": True,
                     "systemd": runner_service,
                 },
                 "mcp": {
@@ -406,6 +470,10 @@ def build_status(repo: Path) -> dict[str, Any]:
                 ),
                 "autonomy": file_state(
                     autonomy_file,
+                    verify=True,
+                ),
+                "pull_control": file_state(
+                    pull_control_file,
                     verify=True,
                 ),
             },
