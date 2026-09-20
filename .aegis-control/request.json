@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 4,
-  "trusted_sha": "a564099eacce7e568d9847b60511afe6be4811a8",
+  "sequence": 5,
+  "trusted_sha": "9983818218492c615c1c70b1c3eae0014741349d",
   "requested_by": "repository-owner",
-  "purpose": "verify-latest-tested-live-nas-control-channel"
+  "purpose": "verify-latest-ci-green-live-nas-status"
 }
