@@ -21,6 +21,7 @@ from aegis_autonomy_supervisor import (
 )
 from aegis_local_ai_miner import REPORT as AI_REPORT
 from aegis_last_known_good import active_status, activate_current_lkg, current, provisional_status, observe_provisional, restore
+from aegis_provenance import verify_provenance
 from aegis_project_context import (
     context_packet as project_context_packet_impl,
     continuity_check as project_continuity_check_impl,
@@ -41,6 +42,12 @@ LEARNING_GATE_FILE = Path(
     os.environ.get(
         "AEGIS_LEARNING_GATE",
         Path.home() / ".local/state/aegis-ai-miner/learning-gate.json",
+    )
+)
+PULL_CONTROL_FILE = Path(
+    os.environ.get(
+        "AEGIS_PULL_CONTROL_STATE_FILE",
+        Path.home() / ".local/state/aegis-pull-control/state.json",
     )
 )
 
@@ -64,6 +71,22 @@ def _read_json(path: Path, missing_status: str) -> dict:
         return value if isinstance(value, dict) else {}
     except Exception as exc:
         return {"status": "unreadable", "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _verified_state(path: Path, missing_status: str) -> dict:
+    value = _read_json(path, missing_status)
+    if value.get("status") == missing_status:
+        return value
+    ok, reason = verify_provenance(value)
+    if not ok:
+        return {
+            "status": "blocked",
+            "reason": "provenance-invalid",
+            "provenance_reason": reason,
+        }
+    result = dict(value)
+    result["provenance_verified"] = True
+    return result
 
 
 def _status() -> dict:
@@ -174,6 +197,16 @@ def autonomy_policy_resource() -> str:
     )
 
 
+@mcp.resource("aegis://control/primary")
+def primary_control_resource() -> str:
+    """Verified NAS primary outbound-pull control state."""
+    return json.dumps(
+        _verified_state(PULL_CONTROL_FILE, "not-yet-measured"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -262,6 +295,12 @@ def learning_cards(limit: int = 20) -> list[dict]:
 def project_context() -> dict:
     """Return the signed active project/thread/style/pending-action context."""
     return project_context_impl()
+
+
+@mcp.tool()
+def primary_control_status() -> dict:
+    """Return verified NAS outbound-pull sequence/transport state."""
+    return _verified_state(PULL_CONTROL_FILE, "not-yet-measured")
 
 
 @mcp.tool()
