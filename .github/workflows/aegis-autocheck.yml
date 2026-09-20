@@ -78,6 +78,10 @@ on:
       - 'scripts/aegis_service_lifecycle_install.sh'
       - 'scripts/aegis_offline_escrow.py'
       - 'scripts/aegis_offline_escrow_install.sh'
+      - 'config/backup/aegis-runtime-backup.json'
+      - 'scripts/aegis_runtime_backup.py'
+      - 'scripts/aegis_runtime_backup_install.sh'
+      - 'scripts/test_aegis_runtime_backup.py'
       - 'scripts/test_aegis_offline_escrow.py'
       - 'scripts/test_aegis_supply_chain.py'
       - 'scripts/test_aegis_service_lifecycle.py'
@@ -177,6 +181,10 @@ on:
       - 'scripts/aegis_service_lifecycle_install.sh'
       - 'scripts/aegis_offline_escrow.py'
       - 'scripts/aegis_offline_escrow_install.sh'
+      - 'config/backup/aegis-runtime-backup.json'
+      - 'scripts/aegis_runtime_backup.py'
+      - 'scripts/aegis_runtime_backup_install.sh'
+      - 'scripts/test_aegis_runtime_backup.py'
       - 'scripts/test_aegis_offline_escrow.py'
       - 'scripts/test_aegis_supply_chain.py'
       - 'scripts/test_aegis_service_lifecycle.py'
@@ -306,11 +314,14 @@ jobs:
       - name: Run AEGIS offline escrow regression tests
         run: python3 scripts/test_aegis_offline_escrow.py
 
+      - name: Run AEGIS encrypted runtime backup regression tests
+        run: python3 scripts/test_aegis_runtime_backup.py
+
       - name: Run AEGIS supply-chain regression tests
         run: python3 scripts/test_aegis_supply_chain.py
 
       - name: Validate hardened shell syntax
-        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_zero_cost_bootstrap.sh scripts/aegis_iphone_ashell_bootstrap.sh scripts/aegis_shortcuts_remote_launcher.sh scripts/aegis_coder_router.sh scripts/aegis_coder_boot_guard.sh scripts/aegis_coder_boot_install.sh scripts/aegis_codex_oss_install.sh scripts/aegis_opencode_install.sh scripts/aegis_voice_bridge_install.sh scripts/aegis_user_persistence.sh scripts/aegis_mcp_runtime_install.sh scripts/aegis_docker_efficiency_install.sh scripts/aegis_autonomy_install.sh scripts/aegis_service_lifecycle_install.sh scripts/aegis_offline_escrow_install.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
+        run: bash -n scripts/aegis_nas_bootstrap.sh scripts/aegis_nas_run_once.sh scripts/aegis_scheduled_run.sh scripts/aegis_scheduler_install.sh scripts/aegis_deploy_local.sh scripts/aegis_remote_apply_retry.sh scripts/aegis_tailscale_bridge.sh scripts/aegis_runner_install.sh scripts/aegis_access_bootstrap.sh scripts/aegis_bootstrap_from_github.sh scripts/aegis_pull_control_install.sh scripts/aegis_zero_cost_bootstrap.sh scripts/aegis_iphone_ashell_bootstrap.sh scripts/aegis_shortcuts_remote_launcher.sh scripts/aegis_coder_router.sh scripts/aegis_coder_boot_guard.sh scripts/aegis_coder_boot_install.sh scripts/aegis_codex_oss_install.sh scripts/aegis_opencode_install.sh scripts/aegis_voice_bridge_install.sh scripts/aegis_user_persistence.sh scripts/aegis_mcp_runtime_install.sh scripts/aegis_docker_efficiency_install.sh scripts/aegis_autonomy_install.sh scripts/aegis_service_lifecycle_install.sh scripts/aegis_offline_escrow_install.sh scripts/aegis_runtime_backup_install.sh scripts/aegis_export_collect.sh scripts/aegis_source_detect.sh
 
       - name: Run AEGIS guardian regression tests
         run: python3 scripts/test_aegis_guardian.py
@@ -331,7 +342,7 @@ jobs:
         run: python3 scripts/test_aegis_learning_gate.py
 
       - name: Compile guardian, deploy, retry, runner, tunnel, access, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_secret_guard.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_project_context.py scripts/aegis_docker_efficiency.py scripts/aegis_autonomy_supervisor.py scripts/aegis_service_lifecycle.py scripts/aegis_offline_escrow.py scripts/aegis_local_model_select.py scripts/aegis_opencode_guard.py scripts/aegis_worker_control.py scripts/aegis_voice_bridge.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_secret_guard.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_aegis_coder_router.py scripts/test_aegis_local_model_select.py scripts/test_aegis_opencode_guard.py scripts/test_aegis_worker_control.py scripts/test_aegis_voice_bridge.py scripts/test_aegis_coder_boot.py scripts/test_aegis_codex_oss.py scripts/test_aegis_user_persistence.py scripts/test_aegis_project_context.py scripts/test_aegis_mcp_runtime.py scripts/test_aegis_docker_efficiency.py scripts/test_aegis_autonomy.py scripts/test_aegis_service_lifecycle.py scripts/test_aegis_offline_escrow.py scripts/test_aegis_supply_chain.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_secret_guard.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_project_context.py scripts/aegis_docker_efficiency.py scripts/aegis_autonomy_supervisor.py scripts/aegis_service_lifecycle.py scripts/aegis_offline_escrow.py scripts/aegis_runtime_backup.py scripts/aegis_local_model_select.py scripts/aegis_opencode_guard.py scripts/aegis_worker_control.py scripts/aegis_voice_bridge.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_secret_guard.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_aegis_coder_router.py scripts/test_aegis_local_model_select.py scripts/test_aegis_opencode_guard.py scripts/test_aegis_worker_control.py scripts/test_aegis_voice_bridge.py scripts/test_aegis_coder_boot.py scripts/test_aegis_codex_oss.py scripts/test_aegis_user_persistence.py scripts/test_aegis_project_context.py scripts/test_aegis_mcp_runtime.py scripts/test_aegis_docker_efficiency.py scripts/test_aegis_autonomy.py scripts/test_aegis_service_lifecycle.py scripts/test_aegis_offline_escrow.py scripts/test_aegis_runtime_backup.py scripts/test_aegis_supply_chain.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
@@ -347,7 +358,7 @@ jobs:
           from mcp.server import MCPServer
           if not isinstance(mod.mcp, MCPServer):
               raise SystemExit('mcp object is not an MCPServer')
-          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'project_context', 'project_context_packet', 'project_continuity_check', 'record_project_handoff', 'primary_control_status', 'service_lifecycle_status', 'local_model_registry', 'worker_fleet_status', 'wake_worker', 'voice_bridge_status', 'autonomy_status', 'autonomy_policy', 'enqueue_autonomy_task', 'run_autonomy_cycle', 'run_guardian_cycle'):
+          for name in ('guardian_status', 'local_ai_inventory', 'model_agent_matrix', 'learning_gate_status', 'active_state_status', 'activate_last_known_good', 'provisional_learning_status', 'record_probation_result', 'last_known_good_status', 'restore_last_known_good', 'learning_cards', 'project_context', 'project_context_packet', 'project_continuity_check', 'record_project_handoff', 'primary_control_status', 'service_lifecycle_status', 'local_model_registry', 'worker_fleet_status', 'wake_worker', 'voice_bridge_status', 'runtime_backup_status', 'autonomy_status', 'autonomy_policy', 'enqueue_autonomy_task', 'run_autonomy_cycle', 'run_guardian_cycle'):
               if not callable(getattr(mod, name, None)):
                   raise SystemExit(f'MCP callable missing: {name}')
           import os
