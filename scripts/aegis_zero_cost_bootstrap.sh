@@ -73,6 +73,7 @@ else
   MCP_STATUS="failed:$mcp_rc"
 fi
 echo "mcp_runtime=$MCP_STATUS"
+echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 
 echo "=== AEGIS LOCAL CODEX OSS ==="
 CODEX_OSS_STATUS="skipped"
@@ -105,6 +106,21 @@ else
   CODER_BOOT_STATUS="user-systemd-unavailable"
 fi
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
+
+echo "=== AEGIS DOCKER EFFICIENCY ==="
+DOCKER_EFFICIENCY_STATUS="skipped"
+if command -v docker >/dev/null 2>&1; then
+  set +e
+  bash scripts/aegis_docker_efficiency_install.sh
+  docker_efficiency_rc=$?
+  set -e
+  if [[ "$docker_efficiency_rc" -eq 0 ]]; then
+    DOCKER_EFFICIENCY_STATUS="active"
+  else
+    DOCKER_EFFICIENCY_STATUS="failed:$docker_efficiency_rc"
+  fi
+fi
+echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
