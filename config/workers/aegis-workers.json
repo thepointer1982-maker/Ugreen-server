@@ -1,0 +1,33 @@
+{
+  "schema": "aegis-worker-fleet/v1",
+  "workers": [
+    {
+      "id": "mac-mini-m2",
+      "type": "macos",
+      "role": [
+        "coder-worker",
+        "ollama-worker"
+      ],
+      "enabled": false,
+      "wol": {
+        "enabled": false,
+        "mac": null,
+        "broadcast": "255.255.255.255",
+        "port": 9
+      },
+      "ssh": {
+        "enabled": false,
+        "host": null,
+        "port": 22
+      },
+      "note": "Enable only after physical MAC/IP verification on the LAN."
+    }
+  ],
+  "policy": {
+    "lan_only": true,
+    "arbitrary_target_denied": true,
+    "public_network_denied": true,
+    "wake_requires_enabled_worker": true,
+    "ssh_requires_separate_verified_configuration": true
+  }
+}
