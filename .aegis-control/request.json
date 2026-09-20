@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 14,
-  "trusted_sha": "0ebcd17542f5a6fd909553939fc0d12cd7ddeece",
+  "sequence": 15,
+  "trusted_sha": "b63e4ab6ca75c381129d9b88db477eeb01fd21d6",
   "requested_by": "repository-owner",
-  "purpose": "physical-ugreen-gate-project-continuity-mcp-local-codex"
+  "purpose": "physical-ugreen-gate-fast-local-codex-mcp-runner-continuity"
 }
