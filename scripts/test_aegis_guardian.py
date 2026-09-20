@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -58,6 +59,51 @@ def main() -> None:
         rows = [json.loads(x) for x in mod.CARDS_FILE.read_text().splitlines()]
         assert len(rows) == 2
         assert rows[-1]["fingerprint"] == rows[0]["fingerprint"]
+
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        repo = root / "repo"
+        repo.mkdir()
+        state_dir = root / "bootstrap"
+        state_dir.mkdir()
+        report = state_dir / "preflight.json"
+        report.write_text(
+            json.dumps(
+                {
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "ready",
+                    "repo_root": str(repo.resolve()),
+                    "blockers": [],
+                    "source": {"status": "ready"},
+                    "git": {"is_repo": True},
+                }
+            ),
+            encoding="utf-8",
+        )
+        old_reuse = os.environ.get("AEGIS_GUARDIAN_REUSE_PREFLIGHT")
+        old_state = os.environ.get("AEGIS_STATE_DIR")
+        os.environ["AEGIS_GUARDIAN_REUSE_PREFLIGHT"] = "1"
+        os.environ["AEGIS_STATE_DIR"] = str(state_dir)
+        try:
+            reused = mod.reusable_preflight(repo)
+            assert reused is not None
+            assert reused.returncode == 0
+            assert reused.args == ["reused-preflight"]
+            assert '"reused": true' in reused.stdout.lower()
+
+            payload = json.loads(report.read_text(encoding="utf-8"))
+            payload["repo_root"] = str(root / "wrong")
+            report.write_text(json.dumps(payload), encoding="utf-8")
+            assert mod.reusable_preflight(repo) is None
+        finally:
+            if old_reuse is None:
+                os.environ.pop("AEGIS_GUARDIAN_REUSE_PREFLIGHT", None)
+            else:
+                os.environ["AEGIS_GUARDIAN_REUSE_PREFLIGHT"] = old_reuse
+            if old_state is None:
+                os.environ.pop("AEGIS_STATE_DIR", None)
+            else:
+                os.environ["AEGIS_STATE_DIR"] = old_state
 
     with tempfile.TemporaryDirectory() as raw:
         cwd = Path(raw)
