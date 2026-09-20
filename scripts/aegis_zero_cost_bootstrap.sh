@@ -43,7 +43,26 @@ HEAD_SHA="$(git rev-parse HEAD)"
 echo "repo=$DEST"
 echo "head=$HEAD_SHA"
 
+echo "=== AEGIS PRIMARY ZERO-COST CONTROL ==="
 bash scripts/aegis_pull_control_install.sh
+
+echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
+RUNNER_STATUS="skipped"
+if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
+  echo "github_cli_auth=ready"
+  set +e
+  bash scripts/aegis_access_bootstrap.sh runner
+  runner_rc=$?
+  set -e
+  if [[ "$runner_rc" -eq 0 ]]; then
+    RUNNER_STATUS="active"
+  else
+    RUNNER_STATUS="failed:$runner_rc"
+  fi
+else
+  echo "github_cli_auth=unavailable"
+fi
+echo "runner_return_channel=$RUNNER_STATUS"
 
 echo "=== AEGIS PULL CONTROL FIRST RUN ==="
 set +e
@@ -66,3 +85,4 @@ if [[ "$rc" -ne 0 ]]; then
 fi
 
 echo "AEGIS zero-cost pull control active."
+echo "runner_return_channel=$RUNNER_STATUS"
