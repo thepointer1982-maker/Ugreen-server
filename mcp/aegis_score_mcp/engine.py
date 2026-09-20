@@ -367,7 +367,16 @@ class ScoreEngine:
                 prev_value = _number(old.get("value"))
                 prev_status = _normalize_status(old.get("status"))
                 new = key not in previous
-                changed = new or value != prev_value or status != prev_status
+                changed = bool(
+                    new
+                    or value != prev_value
+                    or status != prev_status
+                    or evidence != old.get("evidence_class")
+                    or provenance_verified != bool(old.get("provenance_verified", False))
+                    or hash_verified != old.get("hash_verified")
+                    or export_session != old.get("export_session")
+                    or file_hash != old.get("file_sha256")
+                )
                 delta = value - prev_value if value is not None and prev_value is not None else None
                 warning = self._warning(metric, value, status, prev_value, prev_status, evidence, freshness, hash_verified)
                 countable = bool(
@@ -437,6 +446,11 @@ class ScoreEngine:
                 notes.append("GATE_OR_HEALTH_ALERT")
         return ",".join(dict.fromkeys(notes)) or None
 
+    @staticmethod
+    def _metric_identity(name: str) -> str:
+        leaf = name.split(".")[-1]
+        return re.sub(r"\\[\\d+\\]", "", leaf).lower()
+
     def scan(self, include_unchanged: bool = False) -> dict[str, Any]:
         baseline = self._baseline()
         previous = baseline.get("records", {})
@@ -459,6 +473,64 @@ class ScoreEngine:
             and (r.evidence_class in REAL_EVIDENCE or r.hash_verified is False)
         ]
         real_changes = [r for r in records if r.counts_as_real_improvement]
+        first_real_device_values = [
+            r for r in records
+            if r.new
+            and r.evidence_class == "REAL_DEVICE_MEASUREMENT"
+            and r.provenance_verified
+            and r.freshness == "FRESH"
+            and r.hash_verified is not False
+        ]
+
+        current_verified = [
+            r for r in all_records
+            if r.evidence_class in REAL_EVIDENCE
+            and r.provenance_verified
+            and r.freshness == "FRESH"
+            and r.hash_verified is not False
+        ]
+        by_metric: dict[str, list[ScoreRecord]] = {}
+        for record in current_verified:
+            by_metric.setdefault(self._metric_identity(record.name), []).append(record)
+
+        conflicts: list[dict[str, Any]] = []
+        for name, group in by_metric.items():
+            signatures = {
+                ("value", r.value) if r.value is not None else ("status", r.status)
+                for r in group
+            }
+            if len(group) > 1 and len(signatures) > 1:
+                conflicts.append({
+                    "name": name,
+                    "records": [
+                        {
+                            "source": r.source,
+                            "path": r.path,
+                            "value": r.value,
+                            "status": r.status,
+                            "evidence_class": r.evidence_class,
+                            "observed_at": r.observed_at,
+                            "file_sha256": r.file_sha256,
+                        }
+                        for r in group
+                    ],
+                })
+
+        current_keys = {r.key for r in all_records}
+        available_sources = {name for name, root in self.roots.items() if root.exists()}
+        missing_verified_records = [
+            {
+                "key": key,
+                **old,
+            }
+            for key, old in previous.items()
+            if isinstance(old, dict)
+            and old.get("source") in available_sources
+            and key not in current_keys
+            and old.get("evidence_class") in REAL_EVIDENCE
+            and bool(old.get("provenance_verified"))
+        ]
+
         return {
             "generated_at": _iso(_utcnow()),
             "baseline_generated_at": baseline.get("generated_at"),
@@ -467,9 +539,17 @@ class ScoreEngine:
             "changed_count": len(records),
             "real_verified_change_count": len(real_changes),
             "alert_count": len(alerts),
+            "conflict_count": len(conflicts),
+            "first_real_device_value_count": len(first_real_device_values),
+            "missing_verified_record_count": len(missing_verified_records),
             "records": [asdict(r) for r in records],
             "alerts": [asdict(r) for r in alerts],
-            "notification_recommended": bool(real_changes or alerts),
+            "conflicts": conflicts,
+            "first_real_device_values": [asdict(r) for r in first_real_device_values],
+            "missing_verified_records": missing_verified_records,
+            "notification_recommended": bool(
+                real_changes or alerts or conflicts or missing_verified_records
+            ),
         }
 
     def commit_baseline(self) -> dict[str, Any]:
@@ -482,8 +562,11 @@ class ScoreEngine:
                 "path": r["path"],
                 "observed_at": r["observed_at"],
                 "file_sha256": r["file_sha256"],
+                "git_commit": r["git_commit"],
+                "export_session": r["export_session"],
                 "evidence_class": r["evidence_class"],
                 "provenance_verified": r["provenance_verified"],
+                "hash_verified": r["hash_verified"],
             }
             for r in full["records"]
         }
