@@ -116,6 +116,7 @@ The failure is now reported immediately before sign-in while using the thumb/fin
 AEGIS now records:
 
 - biometric PnP endpoints and signed biometric driver metadata
+- ESS fingerprint capability via the sensor's `SecureFingerprint` configuration and WinBio configuration branches
 - Windows Biometric Service (`WbioSrvc`)
 - `Microsoft-Windows-Biometrics/Operational`
 - biometric Event ID 1108
@@ -208,3 +209,16 @@ Interpretation:
 
 - wired headset + Echo isolated + no black screen: Echo/Bluetooth/audio PnP transition becomes a strong candidate.
 - black screen still occurs: Echo timing was likely incidental; fingerprint/Hello, GPU/DWM, or Winlogon stay higher.
+
+
+### Fail-safe post-login recovery
+
+The trusted bootstrap now installs a separate user-session recovery task. About 20 seconds after sign-in it first runs the collector, then checks whether `explorer.exe` exists in the same interactive session.
+
+If Explorer is missing and Winlogon still names the standard `explorer.exe` shell, AEGIS starts Explorer. It does not terminate any process and does not change DWM, graphics drivers, Windows Hello, fingerprint enrollment, USB, Bluetooth, network, boot configuration, or Codex. If a nonstandard Winlogon shell is configured, recovery fails closed and records the condition instead of rewriting the registry.
+
+Recovery events are appended locally to:
+
+```text
+%LOCALAPPDATA%\AEGIS\LenovoPointer\BlackScreen\recovery-events.jsonl
+```
