@@ -104,9 +104,28 @@ def aegis_score_snapshot(
     engine = engine_from_env()
 
     if initialize_baseline:
+        preflight = engine.scan(include_unchanged=True)
+        integrity_alerts = [
+            item for item in preflight.get("alerts", [])
+            if any(
+                flag in (item.get("warning") or "")
+                for flag in ("HASH_MISMATCH", "FUTURE_TIMESTAMP")
+            )
+        ]
+        if integrity_alerts or preflight.get("conflict_count", 0):
+            preflight["baseline_initialized"] = False
+            preflight["baseline_init_blocked"] = True
+            preflight["baseline_init_block_reasons"] = {
+                "integrity_alerts": integrity_alerts,
+                "conflicts": preflight.get("conflicts", []),
+            }
+            preflight["notification_recommended"] = True
+            return preflight
+
         baseline = engine.commit_baseline()
         result = engine.scan(include_unchanged=include_unchanged)
         result["baseline_initialized"] = True
+        result["baseline_init_blocked"] = False
         result["baseline_commit"] = baseline
         result["notification_recommended"] = False
         return result
