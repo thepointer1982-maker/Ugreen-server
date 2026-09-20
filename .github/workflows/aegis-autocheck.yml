@@ -6,6 +6,9 @@ on:
     paths:
       - 'scores/**'
       - 'scripts/aegis_repo_autocheck.py'
+      - 'scripts/aegis_secret_guard.py'
+      - 'scripts/test_aegis_secret_guard.py'
+      - '.gitignore'
       - 'scripts/aegis_export_collect.sh'
       - 'scripts/aegis_source_detect.sh'
       - 'scripts/aegis_nas_run_once.sh'
@@ -78,6 +81,9 @@ on:
     paths:
       - 'scores/**'
       - 'scripts/aegis_repo_autocheck.py'
+      - 'scripts/aegis_secret_guard.py'
+      - 'scripts/test_aegis_secret_guard.py'
+      - '.gitignore'
       - 'scripts/aegis_export_collect.sh'
       - 'scripts/aegis_source_detect.sh'
       - 'scripts/aegis_nas_run_once.sh'
@@ -149,7 +155,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: aegis-autocheck-${{ github.ref }}
@@ -161,6 +167,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Run AEGIS repository secret guard
+        run: python3 scripts/aegis_secret_guard.py --repo-root .
+
+      - name: Run AEGIS secret-guard regression tests
+        run: python3 scripts/test_aegis_secret_guard.py
 
       - name: Run AEGIS pipeline regression tests
         run: python3 scripts/test_aegis_pipeline.py
@@ -247,7 +259,7 @@ jobs:
         run: python3 scripts/test_aegis_learning_gate.py
 
       - name: Compile guardian, deploy, retry, runner, tunnel, access, real-cycle, real-status, provenance, LKG, miner, matrix, gate and MCP modules
-        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_project_context.py scripts/aegis_docker_efficiency.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_aegis_coder_router.py scripts/test_aegis_coder_boot.py scripts/test_aegis_codex_oss.py scripts/test_aegis_user_persistence.py scripts/test_aegis_project_context.py scripts/test_aegis_mcp_runtime.py scripts/test_aegis_docker_efficiency.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
+        run: python3 -m py_compile scripts/aegis_guardian_cycle.py scripts/aegis_real_cycle.py scripts/aegis_real_status.py scripts/aegis_secret_guard.py scripts/aegis_provenance.py scripts/aegis_last_known_good.py scripts/aegis_local_ai_miner.py scripts/aegis_model_agent_matrix.py scripts/aegis_learning_gate.py scripts/aegis_project_context.py scripts/aegis_docker_efficiency.py scripts/aegis_mcp_server.py scripts/test_aegis_guardian.py scripts/test_aegis_secret_guard.py scripts/test_aegis_deploy_local.py scripts/test_aegis_remote_apply_retry.py scripts/test_aegis_tailscale_bridge.py scripts/test_aegis_runner_control.py scripts/test_aegis_access_bootstrap.py scripts/test_aegis_bootstrap_from_github.py scripts/aegis_pull_control.py scripts/test_aegis_pull_control.py scripts/test_aegis_zero_cost_bootstrap.py scripts/test_aegis_iphone_ashell_bootstrap.py scripts/test_aegis_shortcuts_remote_launcher.py scripts/test_aegis_coder_router.py scripts/test_aegis_coder_boot.py scripts/test_aegis_codex_oss.py scripts/test_aegis_user_persistence.py scripts/test_aegis_project_context.py scripts/test_aegis_mcp_runtime.py scripts/test_aegis_docker_efficiency.py scripts/test_aegis_real_cycle.py scripts/test_aegis_real_status.py scripts/test_aegis_provenance.py scripts/test_aegis_last_known_good.py scripts/test_aegis_local_ai_miner.py scripts/test_aegis_model_agent_matrix.py scripts/test_aegis_learning_gate.py
 
       - name: Validate MCP v2 module
         shell: bash
@@ -334,8 +346,35 @@ jobs:
         if: steps.detect.outputs.has_data == 'true'
         run: python3 scripts/aegis_repo_autocheck.py
 
+
+  publish-generated:
+    if: github.event_name == 'push'
+    needs: autocheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Detect real score data
+        id: detect-publish
+        shell: bash
+        run: |
+          if [[ -f scores/latest.json ]]; then
+            echo 'has_data=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_data=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebuild generated diagnosis
+        if: steps.detect-publish.outputs.has_data == 'true'
+        run: python3 scripts/aegis_repo_autocheck.py
+
       - name: Commit generated diagnosis and fix package
-        if: github.event_name == 'push' && steps.detect.outputs.has_data == 'true'
+        if: steps.detect-publish.outputs.has_data == 'true'
         shell: bash
         run: |
           git config user.name 'aegis-autocheck[bot]'
