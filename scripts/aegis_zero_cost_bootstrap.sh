@@ -191,6 +191,23 @@ else
 fi
 echo "offline_escrow=$ESCROW_STATUS"
 
+echo "=== AEGIS ENCRYPTED RUNTIME BACKUP ==="
+RUNTIME_BACKUP_STATUS="skipped"
+if systemctl --user show-environment >/dev/null 2>&1; then
+  set +e
+  bash scripts/aegis_runtime_backup_install.sh
+  runtime_backup_rc=$?
+  set -e
+  if [[ "$runtime_backup_rc" -eq 0 ]]; then
+    RUNTIME_BACKUP_STATUS="scheduled"
+  else
+    RUNTIME_BACKUP_STATUS="failed:$runtime_backup_rc"
+  fi
+else
+  RUNTIME_BACKUP_STATUS="user-systemd-unavailable"
+fi
+echo "runtime_backup=$RUNTIME_BACKUP_STATUS"
+
 echo "=== AEGIS LAN WORKER FLEET ==="
 WORKER_STATUS="skipped"
 set +e
@@ -269,6 +286,7 @@ echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 echo "autonomy=$AUTONOMY_STATUS"
 echo "lifecycle=$LIFECYCLE_STATUS"
 echo "offline_escrow=$ESCROW_STATUS"
+echo "runtime_backup=$RUNTIME_BACKUP_STATUS"
 echo "workers=$WORKER_STATUS"
 echo "voice_bridge=$VOICE_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
