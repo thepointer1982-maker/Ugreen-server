@@ -17,6 +17,9 @@ def main():
     assert "OPENCODE_DISABLE_DEFAULT_PLUGINS=1" in s
     assert "OPENCODE_DISABLE_LSP_DOWNLOAD=1" in s
     assert "OPENCODE_AUTO_SHARE=false" in s
+    assert "AEGIS_CODER_BOOT_STATE_FILE" in s
+    assert "boot_selected" in s
+    assert "timeout 15s codex login status" in s
     assert "git -C \"$REPO_ROOT\" worktree add --detach" in s
     assert "git -C \"$WORKTREE\" diff --check" in s
     c = json.loads(CONFIG.read_text(encoding="utf-8"))
