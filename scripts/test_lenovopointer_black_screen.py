@@ -47,6 +47,10 @@ def main() -> None:
     assert "summary.json" in collect
     assert "Get-NetConnectionProfile" in collect
     assert "Get-PnpDevice -Class Biometric" in collect
+    assert "biometric-security.json" in collect
+    assert "SecureFingerprint" in collect
+    assert "EssFingerprintCapable" in collect
+    assert "ess_fingerprint_capable_sensor_count" in collect
     assert "Microsoft-Windows-Biometrics/Operational" in collect
     assert "Microsoft-Windows-Winlogon/Operational" in collect
     assert "1108" in collect
