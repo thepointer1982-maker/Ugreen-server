@@ -41,6 +41,8 @@ def main():
     assert 'allowed = {"status", "real-cycle", "deploy-retry"}' in w
     assert "trusted_sha" in w
     assert "merge-base --is-ancestor" in w
+    assert "aegis/resume-pre-lenovo-20260920" in w
+    assert "aegis/guardian-learning-mcp" not in w
     assert 'git -C "$REPO" clean -fdx' in w
     assert "AEGIS_REPO_PATH=$REPO" in w
     assert "curl " not in w
