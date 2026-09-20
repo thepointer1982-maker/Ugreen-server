@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "status",
-  "sequence": 17,
-  "trusted_sha": "6fe8a6d33f35162b6a19cf68e49f263d84f445f8",
+  "sequence": 18,
+  "trusted_sha": "a2846ef611a20b6bc69cf9522cec6256a3801d3b",
   "requested_by": "repository-owner",
-  "purpose": "physical-ugreen-docker-efficiency-all-containers-gate"
+  "purpose": "physical-ugreen-security-docker-secret-guard-least-privilege"
 }
