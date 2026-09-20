@@ -13,6 +13,9 @@ def main():
     assert 'checkout --detach --force "$TRUSTED_SHA"' in text
     assert 'git -C "$DEST" clean -fdx' in text
     assert "aegis_pull_control_install.sh" in text
+    assert "AEGIS_BOOTSTRAP_FROM_PULL_CONTROL" in text
+    assert 'AEGIS_PULL_CONTROL_NO_START="$FROM_PULL_CONTROL"' in text
+    assert "pull_control_first_run=deferred_current_service" in text
     assert "aegis_mcp_runtime_install.sh" in text
     assert "AEGIS_ALLOW_MCP_INSTALL" in text
     assert "aegis_codex_oss_install.sh" in text
