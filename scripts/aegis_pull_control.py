@@ -99,6 +99,10 @@ def prepare_runtime(repo: Path, runtime: Path, sha: str) -> None:
     if not (runtime / ".git").exists():
         runtime.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", "--no-checkout", str(repo), str(runtime)], repo.parent, timeout=180)
+    else:
+        run(["git", "remote", "set-url", "origin", str(repo)], runtime)
+    run(["git", "fetch", "--prune", "origin"], runtime, timeout=180)
+    run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], runtime)
     run(["git", "checkout", "--detach", "--force", sha], runtime)
     run(["git", "reset", "--hard", sha], runtime)
     run(["git", "clean", "-fdx"], runtime)
