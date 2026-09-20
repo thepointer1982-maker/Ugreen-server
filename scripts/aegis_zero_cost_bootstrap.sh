@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="${AEGIS_REPO_URL:-https://github.com/thepointer1982-maker/Ugreen-server.git}"
-BRANCH="${AEGIS_BRANCH:-aegis/guardian-learning-mcp}"
+BRANCH="${AEGIS_BRANCH:-aegis/resume-pre-lenovo-20260920}"
 TRUSTED_SHA="${AEGIS_TRUSTED_SHA:-}"
 DEST="${AEGIS_DEST:-$HOME/aegis/Ugreen-server}"
 
