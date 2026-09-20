@@ -34,6 +34,7 @@ def main():
         pass
     source = SCRIPT.read_text(encoding="utf-8")
     assert '"git", "fetch", "--prune", "origin"' in source
+    assert "aegis/resume-pre-lenovo-20260920" in source
     assert 'merge-base", "--is-ancestor"' in source
     assert '"shell"' not in mod.ALLOWED
 
