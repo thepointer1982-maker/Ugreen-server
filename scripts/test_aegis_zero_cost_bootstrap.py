@@ -13,7 +13,13 @@ def main():
     assert 'checkout --detach --force "$TRUSTED_SHA"' in text
     assert 'git -C "$DEST" clean -fdx' in text
     assert "aegis_pull_control_install.sh" in text
+    assert "aegis_codex_oss_install.sh" in text
+    assert "AEGIS_ALLOW_CODEX_INSTALL" in text
+    assert "AEGIS_ALLOW_MODEL_DOWNLOAD" in text
+    assert "AEGIS_ALLOW_CLOUD_CODEX" in text
+    assert "codex-local" in text
     assert "aegis_coder_boot_install.sh" in text
+    assert "codex_oss=$CODEX_OSS_STATUS" in text
     assert "coder_boot_guardian=$CODER_BOOT_STATUS" in text
     assert "aegis_pull_control.py --repo-root" in text
     assert "aegis-pull-control/state.json" in text
