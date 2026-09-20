@@ -179,8 +179,6 @@ else
     echo "pull-control first run returned rc=$rc" >&2
     exit "$rc"
   fi
-first run returned rc=$rc" >&2
-  exit "$rc"
 fi
 
 echo "AEGIS zero-cost pull control active."
