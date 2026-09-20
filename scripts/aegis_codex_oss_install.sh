@@ -77,8 +77,9 @@ with profile.open("a", encoding="utf-8") as f:
     f.write(
         'enabled_tools = ["project_context", "project_context_packet", '
         '"project_continuity_check", "record_project_handoff", '
-        '"autonomy_status", "autonomy_policy", "enqueue_autonomy_task", '
-        '"run_autonomy_cycle", "guardian_status", "last_known_good_status"]\n'
+        '"primary_control_status", "autonomy_status", "autonomy_policy", '
+        '"enqueue_autonomy_task", "run_autonomy_cycle", "guardian_status", '
+        '"last_known_good_status"]\n'
     )
     f.write('default_tools_approval_mode = "approve"\n')
     f.write("startup_timeout_sec = 3\n")
