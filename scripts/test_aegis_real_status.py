@@ -28,12 +28,14 @@ def main() -> None:
         os.environ["AEGIS_GUARDIAN_STATE_DIR"] = str(root / "state" / "aegis-guardian")
         os.environ["AEGIS_SCHEDULER_STATE_DIR"] = str(root / "state" / "aegis-scheduler")
         os.environ["AEGIS_LKG_STATE_DIR"] = str(root / "state" / "aegis-last-known-good")
+        os.environ["AEGIS_CODER_BOOT_STATE_FILE"] = str(root / "state" / "aegis-coder-boot" / "status.json")
 
         for p in [
             root / "state" / "aegis-real-cycle",
             root / "state" / "aegis-ai-miner",
             root / "state" / "aegis-guardian",
             root / "state" / "aegis-scheduler",
+            root / "state" / "aegis-coder-boot",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -75,6 +77,19 @@ def main() -> None:
             "failures=0\nnext_allowed=0\n",
             encoding="utf-8",
         )
+        (root / "state" / "aegis-coder-boot" / "status.json").write_text(
+            json.dumps(
+                {
+                    "schema": "aegis-coder-boot/v1",
+                    "health": "healthy",
+                    "reason": "preferred-local-ready",
+                    "selected": "local",
+                    "codex": {"ready": True, "auth": "chatgpt"},
+                    "local": {"ready": True},
+                }
+            ),
+            encoding="utf-8",
+        )
 
         mod.systemd_status = lambda unit: {
             "available": True,
@@ -92,6 +107,8 @@ def main() -> None:
         assert status["guardian"]["network_score"] == 80
         assert status["ollama"]["model_count"] == 1
         assert status["scheduler"]["timer"]["ActiveState"] == "active"
+        assert status["coder"]["capability"] == "ready"
+        assert status["coder"]["selected"] == "local"
         assert status["_provenance"]["kind"] == "real-status"
 
     print("AEGIS REAL STATUS TESTS PASS")
