@@ -179,6 +179,18 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-lifecycle" / "status.json",
         )
     )
+    worker_file = Path(
+        os.environ.get(
+            "AEGIS_WORKER_STATE_FILE",
+            home_state / "aegis-workers" / "status.json",
+        )
+    )
+    voice_file = Path(
+        os.environ.get(
+            "AEGIS_VOICE_STATUS_FILE",
+            home_state / "aegis-voice" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -192,6 +204,8 @@ def build_status(repo: Path) -> dict[str, Any]:
     autonomy = read_json(autonomy_file)
     pull_control = read_json(pull_control_file)
     lifecycle = read_json(lifecycle_file)
+    workers = read_json(worker_file)
+    voice = read_json(voice_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -211,6 +225,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     autonomy_timer = systemd_status("aegis-autonomy.timer")
     pull_control_timer = systemd_status("aegis-pull-control.timer")
     lifecycle_timer = systemd_status("aegis-lifecycle.timer")
+    voice_service = systemd_status("aegis-voice-bridge.service")
 
     health = "healthy"
     blockers: list[str] = []
@@ -354,6 +369,36 @@ def build_status(repo: Path) -> dict[str, Any]:
             health = "degraded"
         blockers.append("lifecycle-timer-inactive")
 
+    worker_ok = False
+    worker_reason = "missing"
+    if workers:
+        worker_ok, worker_reason = verify_provenance(workers)
+        if not worker_ok:
+            warnings.append("worker-state-provenance-invalid")
+        else:
+            unconfigured = [
+                row.get("id")
+                for row in workers.get("workers", [])
+                if isinstance(row, dict)
+                and row.get("enabled")
+                and not row.get("configured")
+            ]
+            if unconfigured:
+                warnings.append("enabled-worker-unconfigured")
+
+    voice_ok = False
+    voice_reason = "missing"
+    if voice:
+        voice_ok, voice_reason = verify_provenance(voice)
+        if not voice_ok:
+            warnings.append("voice-state-provenance-invalid")
+    if (
+        voice_service.get("available")
+        and voice_service.get("LoadState") == "loaded"
+        and voice_service.get("ActiveState") != "active"
+    ):
+        warnings.append("voice-bridge-inactive")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -389,6 +434,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "autonomy_timer": autonomy_timer,
                 "pull_control_timer": pull_control_timer,
                 "lifecycle_timer": lifecycle_timer,
+                "voice_bridge_service": voice_service,
             },
             "control": {
                 "primary": {
@@ -498,6 +544,22 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "provenance_reason": lifecycle_reason,
                     "systemd_timer": lifecycle_timer,
                 },
+                "workers": {
+                    "health": workers.get("health"),
+                    "workers": workers.get("workers"),
+                    "policy": workers.get("policy"),
+                    "provenance_verified": worker_ok if workers else None,
+                    "provenance_reason": worker_reason,
+                },
+                "voice": {
+                    "health": voice.get("health"),
+                    "transport": voice.get("transport"),
+                    "network_listener": voice.get("network_listener"),
+                    "public_port": voice.get("public_port"),
+                    "provenance_verified": voice_ok if voice else None,
+                    "provenance_reason": voice_reason,
+                    "systemd_service": voice_service,
+                },
             },
             "ollama": {
                 "reachable": ollama.get("reachable"),
@@ -556,6 +618,14 @@ def build_status(repo: Path) -> dict[str, Any]:
                 ),
                 "lifecycle": file_state(
                     lifecycle_file,
+                    verify=True,
+                ),
+                "workers": file_state(
+                    worker_file,
+                    verify=True,
+                ),
+                "voice": file_state(
+                    voice_file,
                     verify=True,
                 ),
             },
