@@ -14,7 +14,7 @@ def main():
     assert "AEGIS_CODEX_OSS_STATE_FILE" in s
     assert "AEGIS_ALLOW_CLOUD_CODEX" in s
     assert "cloud Codex fallback is disabled" in s
-    assert "unset CODEX_API_KEY" in s
+    assert "CODEX_API_KEY CODEX_ACCESS_TOKEN" in s
     assert 'grep -Fq "Logged in using ChatGPT"' in s
     assert "codex exec --ignore-user-config --ephemeral --sandbox workspace-write" in s
     assert '"$LOCAL_CODEX_WRAPPER" exec "$TASK"' in s
