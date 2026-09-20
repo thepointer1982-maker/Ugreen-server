@@ -41,6 +41,9 @@ def main() -> None:
         os.environ["AEGIS_PULL_CONTROL_STATE_FILE"] = str(
             root / "state" / "aegis-pull-control" / "state.json"
         )
+        os.environ["AEGIS_LIFECYCLE_STATE_FILE"] = str(
+            root / "state" / "aegis-lifecycle" / "status.json"
+        )
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -54,6 +57,7 @@ def main() -> None:
             root / "state" / "aegis-docker-efficiency",
             root / "state" / "aegis-autonomy",
             root / "state" / "aegis-pull-control",
+            root / "state" / "aegis-lifecycle",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -229,6 +233,35 @@ def main() -> None:
             encoding="utf-8",
         )
 
+        lifecycle_state = attach_provenance(
+            {
+                "schema": "aegis-service-lifecycle-status/v1",
+                "health": "healthy",
+                "blocked": [],
+                "legacy": [],
+                "review": [],
+                "baseline": {
+                    "reviewed_at": "2026-09-20",
+                    "age_days": 0,
+                    "review_after_days": 60,
+                    "stale": False,
+                },
+                "integration_coverage": [
+                    {"id": "iphone-shortcuts", "status": "implemented"}
+                ],
+                "guardrails": {
+                    "read_only": True,
+                    "auto_update_external_software": False,
+                    "auto_remove_services": False,
+                },
+            },
+            kind="service-lifecycle-status",
+        )
+        (root / "state" / "aegis-lifecycle" / "status.json").write_text(
+            json.dumps(lifecycle_state),
+            encoding="utf-8",
+        )
+
         mod.systemd_status = lambda unit: {
             "available": True,
             "scope": "user",
@@ -265,6 +298,11 @@ def main() -> None:
         assert status["control"]["pull_control"]["provenance_verified"] is True
         assert status["control"]["pull_control"]["last_sequence"] == 19
         assert status["scheduler"]["pull_control_timer"]["ActiveState"] == "active"
+        assert status["scheduler"]["lifecycle_timer"]["ActiveState"] == "active"
+        assert status["control"]["lifecycle"]["health"] == "healthy"
+        assert status["control"]["lifecycle"]["provenance_verified"] is True
+        assert status["control"]["lifecycle"]["blocked"] == []
+        assert "lifecycle-review-needed" not in status["warnings"]
         assert "runner-service-inactive" not in status["blockers"]
         assert status["control"]["runner"]["runner_name"] == "aegis-ugreen-v2"
         assert status["control"]["docker"]["health"] == "healthy"
@@ -298,6 +336,27 @@ def main() -> None:
         assert migrated["control"]["pull_control"]["status"] == "unverified"
         assert migrated["control"]["pull_control"]["last_sequence"] is None
         assert migrated["control"]["pull_control"]["trusted_sha"] is None
+
+        lifecycle_review = attach_provenance(
+            {
+                **{
+                    k: v
+                    for k, v in lifecycle_state.items()
+                    if k != "_provenance"
+                },
+                "health": "degraded",
+                "review": ["opencode"],
+            },
+            kind="service-lifecycle-status",
+        )
+        (root / "state" / "aegis-lifecycle" / "status.json").write_text(
+            json.dumps(lifecycle_review),
+            encoding="utf-8",
+        )
+        review_status = mod.build_status(root)
+        assert review_status["health"] == "healthy"
+        assert "lifecycle-review-needed" in review_status["warnings"]
+        assert review_status["control"]["lifecycle"]["review"] == ["opencode"]
 
     print("AEGIS REAL STATUS TESTS PASS")
 
