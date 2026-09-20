@@ -161,6 +161,12 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-docker-efficiency" / "status.json",
         )
     )
+    autonomy_file = Path(
+        os.environ.get(
+            "AEGIS_AUTONOMY_STATUS_FILE",
+            home_state / "aegis-autonomy" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -171,6 +177,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     mcp_runtime = read_json(mcp_runtime_file)
     runner_state = read_json(runner_state_file)
     docker_efficiency = read_json(docker_efficiency_file)
+    autonomy = read_json(autonomy_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -187,6 +194,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     coder_timer = systemd_status("aegis-coder-boot.timer")
     runner_service = systemd_status("aegis-github-runner.service")
     docker_timer = systemd_status("aegis-docker-efficiency.timer")
+    autonomy_timer = systemd_status("aegis-autonomy.timer")
 
     health = "healthy"
     blockers: list[str] = []
@@ -260,6 +268,22 @@ def build_status(repo: Path) -> dict[str, Any]:
                 f"docker-efficiency-{docker_efficiency.get('health')}"
             )
 
+    if autonomy:
+        autonomy_ok, _ = verify_provenance(autonomy)
+        if not autonomy_ok:
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("autonomy-provenance-invalid")
+        elif autonomy.get("health") not in {"healthy", "degraded"}:
+            if health == "healthy":
+                health = "degraded"
+            blockers.append(
+                f"autonomy-{autonomy.get('health')}"
+            )
+    elif health == "healthy":
+        health = "degraded"
+        blockers.append("autonomy-status-missing")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -291,6 +315,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "timer": timer,
                 "coder_boot_timer": coder_timer,
                 "docker_efficiency_timer": docker_timer,
+                "autonomy_timer": autonomy_timer,
             },
             "control": {
                 "runner": {
@@ -318,6 +343,18 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "metrics": docker_efficiency.get("metrics"),
                     "guardrails": docker_efficiency.get("guardrails"),
                     "systemd_timer": docker_timer,
+                },
+                "autonomy": {
+                    "profile": autonomy.get("profile"),
+                    "health": autonomy.get("health"),
+                    "reason": autonomy.get("reason"),
+                    "action_count": autonomy.get("action_count"),
+                    "queue": autonomy.get("queue"),
+                    "consecutive_failed_cycles": autonomy.get(
+                        "consecutive_failed_cycles"
+                    ),
+                    "policy": autonomy.get("policy"),
+                    "systemd_timer": autonomy_timer,
                 },
             },
             "ollama": {
@@ -365,6 +402,10 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "runner": file_state(runner_state_file),
                 "docker_efficiency": file_state(
                     docker_efficiency_file,
+                    verify=True,
+                ),
+                "autonomy": file_state(
+                    autonomy_file,
                     verify=True,
                 ),
             },
