@@ -44,7 +44,7 @@ if [[ -z "$RUNNER_TOKEN" ]]; then
       -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
       "repos/$RUNNER_REPO/actions/runners/registration-token" \
-      --jq '.token' 2>/dev/null)
+      --jq '.token' 2>/dev/null)"
     gh_rc=$?
     set -e
     if [[ "$gh_rc" -eq 0 && -n "$RUNNER_TOKEN" ]]; then
