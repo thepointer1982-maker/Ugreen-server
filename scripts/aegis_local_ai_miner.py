@@ -358,6 +358,36 @@ def scan_roots(
     return files, dbs, dict(suffix_counts)
 
 
+def tail_lines(
+    path: Path,
+    limit: int = 200,
+    *,
+    max_bytes: int = 512 * 1024,
+    block_size: int = 64 * 1024,
+) -> list[str]:
+    if limit <= 0 or not path.is_file():
+        return []
+    try:
+        size = path.stat().st_size
+        read_total = 0
+        chunks: list[bytes] = []
+        with path.open("rb") as handle:
+            pos = size
+            while pos > 0 and read_total < max_bytes:
+                take = min(block_size, pos, max_bytes - read_total)
+                pos -= take
+                handle.seek(pos)
+                chunk = handle.read(take)
+                chunks.append(chunk)
+                read_total += len(chunk)
+                if b"\n".join(reversed(chunks)).count(b"\n") > limit:
+                    break
+        data = b"".join(reversed(chunks))
+        return data.decode("utf-8", errors="replace").splitlines()[-limit:]
+    except OSError:
+        return []
+
+
 def guardian_summary() -> dict[str, Any]:
     root = Path.home() / ".local/state/aegis-guardian"
     status = {}
@@ -372,14 +402,13 @@ def guardian_summary() -> dict[str, Any]:
         pass
     try:
         p = root / "learning-cards.jsonl"
-        if p.is_file():
-            for line in p.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]:
-                try:
-                    value = json.loads(line)
-                    if isinstance(value, dict):
-                        cards.append(value)
-                except json.JSONDecodeError:
-                    continue
+        for line in tail_lines(p, 200):
+            try:
+                value = json.loads(line)
+                if isinstance(value, dict):
+                    cards.append(value)
+            except json.JSONDecodeError:
+                continue
     except Exception:
         pass
     patterns = Counter((c.get("reason"), c.get("action"), c.get("outcome")) for c in cards)
