@@ -35,6 +35,9 @@ def main() -> None:
         os.environ["AEGIS_DOCKER_EFFICIENCY_STATE_FILE"] = str(
             root / "state" / "aegis-docker-efficiency" / "status.json"
         )
+        os.environ["AEGIS_AUTONOMY_STATUS_FILE"] = str(
+            root / "state" / "aegis-autonomy" / "status.json"
+        )
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -46,6 +49,7 @@ def main() -> None:
             root / "state" / "aegis-mcp",
             root / "state" / "aegis-runner",
             root / "state" / "aegis-docker-efficiency",
+            root / "state" / "aegis-autonomy",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -178,6 +182,28 @@ def main() -> None:
             encoding="utf-8",
         )
 
+        autonomy_state = attach_provenance(
+            {
+                "schema": "aegis-autonomy-status/v1",
+                "profile": "AUTO-MAX-LOCAL",
+                "health": "healthy",
+                "reason": "cycle-complete",
+                "action_count": 1,
+                "queue": {"queued": 0, "processed_task": None},
+                "consecutive_failed_cycles": 0,
+                "policy": {
+                    "profile": "AUTO-MAX-LOCAL",
+                    "local_first": True,
+                    "recurring_cloud_ai_cost_allowed": False,
+                },
+            },
+            kind="autonomy-status",
+        )
+        (root / "state" / "aegis-autonomy" / "status.json").write_text(
+            json.dumps(autonomy_state),
+            encoding="utf-8",
+        )
+
         mod.systemd_status = lambda unit: {
             "available": True,
             "scope": "user",
@@ -213,6 +239,11 @@ def main() -> None:
         assert status["control"]["docker"]["metrics"]["inspect_calls"] == 0
         assert status["control"]["docker"]["guardrails"]["docker_pull"] is False
         assert status["scheduler"]["docker_efficiency_timer"]["ActiveState"] == "active"
+        assert status["scheduler"]["autonomy_timer"]["ActiveState"] == "active"
+        assert status["control"]["autonomy"]["profile"] == "AUTO-MAX-LOCAL"
+        assert status["control"]["autonomy"]["health"] == "healthy"
+        assert status["control"]["autonomy"]["queue"]["queued"] == 0
+        assert status["control"]["autonomy"]["policy"]["recurring_cloud_ai_cost_allowed"] is False
         assert status["_provenance"]["kind"] == "real-status"
 
     print("AEGIS REAL STATUS TESTS PASS")
