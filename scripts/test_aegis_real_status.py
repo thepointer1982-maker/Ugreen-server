@@ -32,6 +32,9 @@ def main() -> None:
         os.environ["AEGIS_CODEX_OSS_STATE_FILE"] = str(root / "state" / "aegis-codex-oss" / "status.json")
         os.environ["AEGIS_MCP_STATE_FILE"] = str(root / "state" / "aegis-mcp" / "runtime.json")
         os.environ["AEGIS_RUNNER_STATE_FILE"] = str(root / "state" / "aegis-runner" / "status.json")
+        os.environ["AEGIS_DOCKER_EFFICIENCY_STATE_FILE"] = str(
+            root / "state" / "aegis-docker-efficiency" / "status.json"
+        )
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -42,6 +45,7 @@ def main() -> None:
             root / "state" / "aegis-codex-oss",
             root / "state" / "aegis-mcp",
             root / "state" / "aegis-runner",
+            root / "state" / "aegis-docker-efficiency",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -146,6 +150,34 @@ def main() -> None:
             encoding="utf-8",
         )
 
+        docker_state = attach_provenance(
+            {
+                "schema": "aegis-docker-efficiency/v1",
+                "health": "healthy",
+                "reason": "stable",
+                "full_inspect_performed": False,
+                "metrics": {
+                    "container_count": 6,
+                    "container_cache_hits": 6,
+                    "inspect_calls": 0,
+                    "compose_files": 2,
+                    "compose_cache_hits": 2,
+                },
+                "guardrails": {
+                    "read_only": True,
+                    "docker_pull": False,
+                    "docker_prune": False,
+                    "docker_restart": False,
+                    "registry_queries": False,
+                },
+            },
+            kind="docker-efficiency",
+        )
+        (root / "state" / "aegis-docker-efficiency" / "status.json").write_text(
+            json.dumps(docker_state),
+            encoding="utf-8",
+        )
+
         mod.systemd_status = lambda unit: {
             "available": True,
             "scope": "user",
@@ -176,6 +208,11 @@ def main() -> None:
         assert status["control"]["runner"]["configured"] is True
         assert status["control"]["runner"]["service_active"] is True
         assert status["control"]["runner"]["runner_name"] == "aegis-ugreen-v2"
+        assert status["control"]["docker"]["health"] == "healthy"
+        assert status["control"]["docker"]["metrics"]["container_count"] == 6
+        assert status["control"]["docker"]["metrics"]["inspect_calls"] == 0
+        assert status["control"]["docker"]["guardrails"]["docker_pull"] is False
+        assert status["scheduler"]["docker_efficiency_timer"]["ActiveState"] == "active"
         assert status["_provenance"]["kind"] == "real-status"
 
     print("AEGIS REAL STATUS TESTS PASS")
