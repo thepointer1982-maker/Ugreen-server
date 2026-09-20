@@ -38,6 +38,12 @@ def main() -> None:
     if incident["status"] == "instrumented-awaiting-real-failure-evidence":
         assert incident["validation"]["conclusion"] == "success"
         assert incident["implementation"]["collector"] == "windows/Collect-LenovoPointerBlackScreen.ps1"
+        assert incident["implementation"]["evidence_resolver"] == "windows/Resolve-LenovoPointerBlackScreen.ps1"
+        assert incident["implementation"]["autonomous_supervisor"] == "windows/Supervise-LenovoPointerBlackScreen.ps1"
+        assert incident["autonomy"]["level"] == "safe-local-self-healing-ready"
+        assert "start missing explorer.exe" in incident["autonomy"]["automatic_actions"]
+        assert incident["validation"]["run_number"] >= 215
+        assert incident["validation"]["autonomous_supervisor_path"] == "success"
     assert "automatic display-driver uninstall" in incident["safety"]["forbidden"]
 
     collect = COLLECT.read_text(encoding="utf-8")
