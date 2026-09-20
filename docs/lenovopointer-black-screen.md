@@ -181,3 +181,30 @@ Codex is treated as a protected workload. AEGIS records only process liveness/CP
 ### USB-C / iPhone
 
 The current iPhone USB-C connection is recorded as a separate correlation path. A connected iPhone is not assumed to cause the black screen. The collector records Apple/iPhone PnP presence plus USBHUB3/USBXHCI/Kernel-PnP warnings/errors so its timing can be compared with the sign-in failure.
+
+
+### Narrow Echo Studio audio/Bluetooth isolation
+
+For the current live test, keep the wired headset connected and isolate only Echo Studio endpoints that Windows classifies as `AudioEndpoint`, `Media`, or `Bluetooth`:
+
+```powershell
+# inspect only
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action PlanEchoAudioIsolation
+
+# elevated PowerShell: isolate Echo Studio only
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action ApplyEchoAudioIsolation
+```
+
+This deliberately does **not** disable the Wi-Fi adapter, Bluetooth radio, biometric reader, Windows Hello, or Codex.
+
+Restore after the A/B test:
+
+```powershell
+# elevated PowerShell
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action RestoreEchoAudio
+```
+
+Interpretation:
+
+- wired headset + Echo isolated + no black screen: Echo/Bluetooth/audio PnP transition becomes a strong candidate.
+- black screen still occurs: Echo timing was likely incidental; fingerprint/Hello, GPU/DWM, or Winlogon stay higher.
