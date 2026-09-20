@@ -7,13 +7,18 @@ BASE_DELAY="${AEGIS_REMOTE_BASE_DELAY:-10}"
 MAX_DELAY="${AEGIS_REMOTE_MAX_DELAY:-120}"
 MODE="${AEGIS_DEPLOY_MODE:-user}"
 REPAIR="${AEGIS_REMOTE_REPAIR:-0}"
+FULL_BOOTSTRAP="${AEGIS_REMOTE_FULL_BOOTSTRAP:-1}"
+PRIMARY_REPO="${AEGIS_PRIMARY_REPO_ROOT:-$HOME/aegis/Ugreen-server}"
 
 usage() {
   cat <<'EOF'
-Usage: aegis_remote_apply_retry.sh [--repo-root PATH] [--attempts N] [--repair]
+Usage: aegis_remote_apply_retry.sh [--repo-root PATH] [--attempts N] [--repair] [--no-full-bootstrap]
 
-Runs the local AEGIS deploy/real-cycle repeatedly on the NAS until the signed
-real-status reports health=healthy, or a hard blocker is encountered.
+By default, first applies the exact trusted checkout as the persistent
+zero-cost AEGIS control plane, then runs local deploy/real-cycle repeatedly
+until signed real-status reports health=healthy or a hard blocker is reached.
+
+--no-full-bootstrap keeps the existing repo in place and only exercises retry logic.
 
 No passwords are read or stored by this script.
 EOF
@@ -29,6 +34,8 @@ while [[ $# -gt 0 ]]; do
       MAX_ATTEMPTS="$2"; shift 2 ;;
     --repair)
       REPAIR=1; shift ;;
+    --no-full-bootstrap)
+      FULL_BOOTSTRAP=0; shift ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -43,6 +50,11 @@ done
   exit 2
 }
 
+[[ "$FULL_BOOTSTRAP" == "0" || "$FULL_BOOTSTRAP" == "1" ]] || {
+  echo "AEGIS_REMOTE_FULL_BOOTSTRAP must be 0 or 1" >&2
+  exit 2
+}
+
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
 cd "$REPO_ROOT"
 
@@ -51,6 +63,9 @@ required=(
   scripts/aegis_real_cycle.py
   scripts/aegis_real_status.py
 )
+if [[ "$FULL_BOOTSTRAP" == "1" ]]; then
+  required+=(scripts/aegis_zero_cost_bootstrap.sh)
+fi
 for path in "${required[@]}"; do
   [[ -f "$path" ]] || { echo "Missing required file: $path" >&2; exit 3; }
 done
@@ -63,6 +78,34 @@ LOG_FILE="$LOG_DIR/retry.log"
 log() {
   printf '%s %s\n' "$(date -Is)" "$*" | tee -a "$LOG_FILE"
 }
+
+if [[ "$FULL_BOOTSTRAP" == "1" ]]; then
+  TRUSTED_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+  [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+    log "stop reason=invalid-trusted-head repo=$REPO_ROOT"
+    exit 22
+  }
+
+  log "bootstrap_start trusted_sha=$TRUSTED_SHA primary_repo=$PRIMARY_REPO"
+  set +e
+  AEGIS_TRUSTED_SHA="$TRUSTED_SHA"   AEGIS_DEST="$PRIMARY_REPO"   AEGIS_BRANCH="aegis/resume-pre-lenovo-20260920"   AEGIS_BOOTSTRAP_FROM_PULL_CONTROL=1   AEGIS_PULL_CONTROL_NO_START=1   AEGIS_ALLOW_CLOUD_CODEX=0   bash "$REPO_ROOT/scripts/aegis_zero_cost_bootstrap.sh" >>"$LOG_FILE" 2>&1
+  bootstrap_rc=$?
+  set -e
+  if [[ "$bootstrap_rc" -ne 0 ]]; then
+    log "stop reason=full-bootstrap-failed rc=$bootstrap_rc"
+    exit 22
+  fi
+
+  REPO_ROOT="$(cd "$PRIMARY_REPO" && pwd)"
+  cd "$REPO_ROOT"
+  for path in scripts/aegis_deploy_local.sh scripts/aegis_real_cycle.py scripts/aegis_real_status.py; do
+    [[ -f "$path" ]] || {
+      log "stop reason=primary-repo-missing path=$path"
+      exit 23
+    }
+  done
+  log "bootstrap_complete repo=$REPO_ROOT trusted_sha=$TRUSTED_SHA"
+fi
 
 read_health() {
   python3 - "$STATUS_FILE" <<'PY'
@@ -122,7 +165,7 @@ delay_for() {
   printf '%s' "$delay"
 }
 
-log "start repo=$REPO_ROOT attempts=$MAX_ATTEMPTS mode=$MODE repair=$REPAIR"
+log "start repo=$REPO_ROOT attempts=$MAX_ATTEMPTS mode=$MODE repair=$REPAIR full_bootstrap=$FULL_BOOTSTRAP"
 
 for ((attempt=1; attempt<=MAX_ATTEMPTS; attempt++)); do
   log "attempt=$attempt/$MAX_ATTEMPTS"
