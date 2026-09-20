@@ -8,6 +8,8 @@ OSS_HOME="${AEGIS_CODEX_OSS_HOME:-$HOME/.local/share/aegis-codex-oss/home}"
 PROFILE_SRC="$REPO_ROOT/config/codex/aegis-local.config.toml"
 PROFILE_DST="$OSS_HOME/aegis-local.config.toml"
 WRAPPER="$BIN_DIR/aegis-codex-local"
+MCP_WRAPPER="${AEGIS_MCP_WRAPPER:-$HOME/.local/bin/aegis-mcp-local}"
+MCP_ATTACHED=0
 STATE_DIR="${AEGIS_CODEX_OSS_STATE_DIR:-$HOME/.local/state/aegis-codex-oss}"
 STATE_FILE="$STATE_DIR/status.json"
 ALLOW_MODEL_DOWNLOAD="${AEGIS_ALLOW_MODEL_DOWNLOAD:-0}"
@@ -58,6 +60,34 @@ codex --help 2>&1 | grep -q -- "--local-provider" || {
 
 [[ -f "$PROFILE_SRC" ]] || { echo "missing profile: $PROFILE_SRC" >&2; exit 5; }
 install -m 600 "$PROFILE_SRC" "$PROFILE_DST"
+
+if [[ -x "$MCP_WRAPPER" ]]; then
+  python3 - "$PROFILE_DST" "$MCP_WRAPPER" "$REPO_ROOT" "$HOME/.local/state/aegis-project" <<'PY'
+import json, sys
+from pathlib import Path
+
+profile = Path(sys.argv[1])
+wrapper, repo, state = sys.argv[2:5]
+with profile.open("a", encoding="utf-8") as f:
+    f.write("\n[mcp_servers.aegis_local]\n")
+    f.write(f"command = {json.dumps(wrapper)}\n")
+    f.write(f"cwd = {json.dumps(repo)}\n")
+    f.write("required = true\n")
+    f.write("enabled = true\n")
+    f.write(
+        'enabled_tools = ["project_context", "project_context_packet", '
+        '"project_continuity_check", "record_project_handoff", '
+        '"guardian_status", "last_known_good_status"]\n'
+    )
+    f.write('default_tools_approval_mode = "approve"\n')
+    f.write("startup_timeout_sec = 3\n")
+    f.write("tool_timeout_sec = 10\n")
+    f.write("\n[mcp_servers.aegis_local.env]\n")
+    f.write(f"AEGIS_REPO_ROOT = {json.dumps(repo)}\n")
+    f.write(f"AEGIS_PROJECT_STATE_DIR = {json.dumps(state)}\n")
+PY
+  MCP_ATTACHED=1
+fi
 
 ollama_ready=0
 if curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
@@ -128,6 +158,8 @@ export AEGIS_CODEX_OSS_WRAPPER="$WRAPPER"
 export AEGIS_CODEX_OSS_PROFILE="$PROFILE_DST"
 export AEGIS_CODEX_OSS_HOME="$OSS_HOME"
 export AEGIS_CODEX_OSS_BIN="$(command -v codex)"
+export AEGIS_CODEX_OSS_MCP_ATTACHED="$MCP_ATTACHED"
+export AEGIS_CODEX_OSS_MCP_WRAPPER="$MCP_WRAPPER"
 
 python3 - <<'PY'
 import json, os, tempfile
@@ -153,6 +185,8 @@ data = {
   "openai_api_key_required":False,
   "web_search":"disabled",
   "shell_network_access":False,
+  "mcp_attached":os.environ["AEGIS_CODEX_OSS_MCP_ATTACHED"] == "1",
+  "mcp_wrapper":os.environ["AEGIS_CODEX_OSS_MCP_WRAPPER"],
 }
 path.parent.mkdir(parents=True, exist_ok=True)
 fd,tmp=tempfile.mkstemp(prefix=path.name+".",dir=str(path.parent))
