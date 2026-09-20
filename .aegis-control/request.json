@@ -1,8 +1,8 @@
 {
   "schema": "aegis-control/v2",
   "action": "deploy-retry",
-  "sequence": 22,
-  "trusted_sha": "21a255a15b898a680fc9beecdd977f2c95348be7",
+  "sequence": 23,
+  "trusted_sha": "9e40d8fcead11ac1508aa7a867801f41a68a796f",
   "requested_by": "repository-owner",
-  "purpose": "install-guarded-opencode-deepseek-routing-worker-wol-and-local-voice-bridge"
+  "purpose": "apply-privacy-first-zero-cost-policy-and-self-hosted-private-ci"
 }
