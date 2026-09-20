@@ -13,6 +13,12 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from aegis_guardian_cycle import CARDS_FILE, STATUS_FILE, execute
+from aegis_autonomy_supervisor import (
+    POLICY_FILE as AUTONOMY_POLICY_FILE,
+    STATUS_FILE as AUTONOMY_STATUS_FILE,
+    queue_task as autonomy_queue_task,
+    run_cycle as autonomy_run_cycle,
+)
 from aegis_local_ai_miner import REPORT as AI_REPORT
 from aegis_last_known_good import active_status, activate_current_lkg, current, provisional_status, observe_provisional, restore
 from aegis_project_context import (
@@ -42,9 +48,10 @@ mcp = MCPServer(
     "AEGIS Local Guardian",
     instructions=(
         "Local-first AEGIS diagnostics. Read status, local AI evidence, "
-        "model scores, learning decisions, and signed project continuity state. "
-        "Channel handoffs preserve project/thread/style/pending-action identity. "
-        "Repair cycles are limited to the allowlist implemented by aegis_guardian_cycle.py."
+        "model scores, learning decisions, signed project continuity state, and "
+        "the shared AUTO-MAX-LOCAL autonomy policy. Channel handoffs preserve "
+        "project/thread/style/pending-action identity. Autonomous work remains local, "
+        "reversible and policy-gated; destructive/external effects remain blocked."
     ),
 )
 
@@ -147,6 +154,26 @@ def alexa_context_resource() -> str:
     )
 
 
+@mcp.resource("aegis://autonomy")
+def autonomy_resource() -> str:
+    """Latest AUTO-MAX-LOCAL supervisor state."""
+    return json.dumps(
+        _read_json(AUTONOMY_STATUS_FILE, "not-yet-measured"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.resource("aegis://autonomy/policy")
+def autonomy_policy_resource() -> str:
+    """Shared maximum-safe-local autonomy policy."""
+    return json.dumps(
+        _read_json(AUTONOMY_POLICY_FILE, "missing"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -235,6 +262,38 @@ def learning_cards(limit: int = 20) -> list[dict]:
 def project_context() -> dict:
     """Return the signed active project/thread/style/pending-action context."""
     return project_context_impl()
+
+
+@mcp.tool()
+def autonomy_status() -> dict:
+    """Return the latest AUTO-MAX-LOCAL supervisor state."""
+    return _read_json(AUTONOMY_STATUS_FILE, "not-yet-measured")
+
+
+@mcp.tool()
+def autonomy_policy() -> dict:
+    """Return the shared maximum-safe-local autonomy policy."""
+    return _read_json(AUTONOMY_POLICY_FILE, "missing")
+
+
+@mcp.tool()
+def enqueue_autonomy_task(
+    task: str,
+    priority: str = "normal",
+    source: str = "mcp",
+) -> dict:
+    """Queue one bounded local-AI task for autonomous processing."""
+    return autonomy_queue_task(
+        task,
+        source=source,
+        priority=priority,
+    )
+
+
+@mcp.tool()
+def run_autonomy_cycle() -> dict:
+    """Run one local policy-gated AUTO-MAX-LOCAL supervisor cycle."""
+    return autonomy_run_cycle()
 
 
 @mcp.tool()
