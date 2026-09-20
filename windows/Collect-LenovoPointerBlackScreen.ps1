@@ -112,6 +112,66 @@ $winlogonConfig = Safe-Run {
 } "winlogon-config"
 Write-JsonFile (Join-Path $outDir "winlogon-config.json") $winlogonConfig
 
+$audioEndpoints = Safe-Run {
+  if (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue) {
+    Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+      Where-Object {
+        $_.Class -in @("AudioEndpoint","Media") -or
+        ($_.Class -eq "Bluetooth" -and $_.FriendlyName -match "(?i)Echo|Headset|Headphone")
+      } |
+      Select-Object Status, Class, FriendlyName, InstanceId, Problem
+  }
+} "audio-endpoints"
+Write-JsonFile (Join-Path $outDir "audio-endpoints.json") $audioEndpoints
+
+$credentialProviders = Safe-Run {
+  $root = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\Credential Providers"
+  if (Test-Path $root) {
+    Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
+      $guid = $_.PSChildName
+      $item = Get-Item -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+      $name = $(if ($item) { $item.GetValue("") } else { $null })
+      $clsidPath = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\$guid\InprocServer32"
+      $dll = $null
+      if (Test-Path $clsidPath) {
+        $dllItem = Get-Item -LiteralPath $clsidPath -ErrorAction SilentlyContinue
+        if ($dllItem) { $dll = $dllItem.GetValue("") }
+      }
+      $signatureStatus = $null
+      $signer = $null
+      if ($dll -and (Test-Path -LiteralPath $dll)) {
+        $sig = Get-AuthenticodeSignature -FilePath $dll -ErrorAction SilentlyContinue
+        if ($sig) {
+          $signatureStatus = [string]$sig.Status
+          if ($sig.SignerCertificate) { $signer = $sig.SignerCertificate.Subject }
+        }
+      }
+      [pscustomobject]@{
+        Guid = $guid
+        Name = $name
+        Dll = $dll
+        SignatureStatus = $signatureStatus
+        Signer = $signer
+      }
+    }
+  }
+} "credential-providers"
+Write-JsonFile (Join-Path $outDir "credential-providers.json") $credentialProviders
+
+$credentialProviderFilters = Safe-Run {
+  $root = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\Credential Provider Filters"
+  if (Test-Path $root) {
+    Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
+      $item = Get-Item -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+      [pscustomobject]@{
+        Guid = $_.PSChildName
+        Name = $(if ($item) { $item.GetValue("") } else { $null })
+      }
+    }
+  }
+} "credential-provider-filters"
+Write-JsonFile (Join-Path $outDir "credential-provider-filters.json") $credentialProviderFilters
+
 $processes = Safe-Run {
   Get-Process -Name bioiso,ngciso,LogonUI,winlogon,userinit,dwm,explorer,codex,node,python,python3,pwsh,powershell -ErrorAction SilentlyContinue |
     Select-Object Name, Id, StartTime, Responding, CPU, WorkingSet64
@@ -187,6 +247,15 @@ $helloIsolationProcesses = @($processes | Where-Object { $_.Name -in @("bioiso",
 $codexProcesses = @($processes | Where-Object { $_.Name -eq "codex" }).Count
 $usbAppleDevices = @($usbApplePnp | Where-Object { $_.FriendlyName -match "(?i)Apple|iPhone" }).Count
 $usbErrors = @($events | Where-Object { $_.ProviderName -match "(?i)USBHUB3|USBXHCI|Kernel-PnP" -and $_.LevelDisplayName -match "(?i)Error|Critical|Warning" }).Count
+$echoAudioEndpoints = @($audioEndpoints | Where-Object { $_.FriendlyName -match "(?i)Echo Studio|Amazon Echo|Echo" }).Count
+$headsetAudioEndpoints = @($audioEndpoints | Where-Object { $_.FriendlyName -match "(?i)Headset|Headphone|Kopfhörer|Realtek|USB Audio" }).Count
+$credentialProviderCount = @($credentialProviders).Count
+$credentialProviderFilterCount = @($credentialProviderFilters).Count
+$invalidCredentialProviderSignatures = @(
+  $credentialProviders | Where-Object {
+    $_.Dll -and $_.SignatureStatus -and $_.SignatureStatus -ne "Valid"
+  }
+).Count
 $shellConfigured = [string]$winlogonConfig.Shell
 $userinitConfigured = [string]$winlogonConfig.Userinit
 $shellConfigMismatch = 0
@@ -194,7 +263,7 @@ if ($shellConfigured -and $shellConfigured -notmatch "(?i)^explorer\.exe$") { $s
 if ($userinitConfigured -and $userinitConfigured -notmatch "(?i)userinit\.exe") { $shellConfigMismatch++ }
 
 $scores = [ordered]@{
-  windows_hello_biometrics = [Math]::Min(100, ($biometricErrors * 25) + ($(if ($biometricEndpoints -gt 0 -and $biometric1108 -gt 0) { 10 } else { 0 })))
+  windows_hello_biometrics = [Math]::Min(100, ($biometricErrors * 25) + ($(if ($biometricEndpoints -gt 0 -and $biometric1108 -gt 0) { 10 } else { 0 })) + ($credentialProviderFilterCount * 20) + ($invalidCredentialProviderSignatures * 25))
   gpu_display_driver = [Math]::Min(100, ($display4101 * 35) + ($liveKernelCount * 25))
   shell_dwm_explorer = [Math]::Min(100, ($dwmCrashes * 30) + ($explorerCrashes * 30) + ($shellConfigMismatch * 35))
   bluetooth_wifi_combo = [Math]::Min(100, ($btWifiErrors * 15) + ($(if ($echoEndpoints -gt 0) { 20 } else { 0 })))
@@ -221,6 +290,11 @@ $summary = [ordered]@{
     codex_processes_alive = $codexProcesses
     apple_iphone_usb_devices = $usbAppleDevices
     usb_pnp_warning_error_events = $usbErrors
+    echo_audio_endpoint_count = $echoAudioEndpoints
+    headset_audio_endpoint_count = $headsetAudioEndpoints
+    credential_provider_count = $credentialProviderCount
+    credential_provider_filter_count = $credentialProviderFilterCount
+    invalid_credential_provider_signature_count = $invalidCredentialProviderSignatures
     winlogon_shell_mismatch_count = $shellConfigMismatch
     hiberboot_enabled = $fastStartup.HiberbootEnabled
   }
