@@ -44,6 +44,9 @@ def main() -> None:
         os.environ["AEGIS_LIFECYCLE_STATE_FILE"] = str(
             root / "state" / "aegis-lifecycle" / "status.json"
         )
+        os.environ["AEGIS_RUNTIME_BACKUP_STATUS_FILE"] = str(
+            root / "state" / "aegis-runtime-backup" / "status.json"
+        )
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -58,6 +61,7 @@ def main() -> None:
             root / "state" / "aegis-autonomy",
             root / "state" / "aegis-pull-control",
             root / "state" / "aegis-lifecycle",
+            root / "state" / "aegis-runtime-backup",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -262,6 +266,27 @@ def main() -> None:
             encoding="utf-8",
         )
 
+        runtime_backup_state = attach_provenance(
+            {
+                "schema": "aegis-runtime-backup-status/v1",
+                "generated_at": "2026-09-20T18:00:00+00:00",
+                "health": "healthy",
+                "last_backup": "/home/aegis/aegis-backups/runtime/aegis-runtime.enc",
+                "manifest": "/home/aegis/aegis-backups/runtime/aegis-runtime.enc.manifest.json",
+                "cipher_sha256": "a" * 64,
+                "key_fingerprint": "b" * 24,
+                "file_count": 42,
+                "size_bytes": 4096,
+                "encrypted": True,
+                "network_upload": False,
+            },
+            kind="runtime-backup-status",
+        )
+        (root / "state" / "aegis-runtime-backup" / "status.json").write_text(
+            json.dumps(runtime_backup_state),
+            encoding="utf-8",
+        )
+
         mod.systemd_status = lambda unit: {
             "available": True,
             "scope": "user",
@@ -299,9 +324,16 @@ def main() -> None:
         assert status["control"]["pull_control"]["last_sequence"] == 19
         assert status["scheduler"]["pull_control_timer"]["ActiveState"] == "active"
         assert status["scheduler"]["lifecycle_timer"]["ActiveState"] == "active"
+        assert status["scheduler"]["runtime_backup_timer"]["ActiveState"] == "active"
         assert status["control"]["lifecycle"]["health"] == "healthy"
         assert status["control"]["lifecycle"]["provenance_verified"] is True
         assert status["control"]["lifecycle"]["blocked"] == []
+        assert status["control"]["runtime_backup"]["health"] == "healthy"
+        assert status["control"]["runtime_backup"]["encrypted"] is True
+        assert status["control"]["runtime_backup"]["network_upload"] is False
+        assert status["control"]["runtime_backup"]["provenance_verified"] is True
+        assert status["control"]["runtime_backup"]["file_count"] == 42
+        assert "runtime-backup-not-yet-created" not in status["warnings"]
         assert "lifecycle-review-needed" not in status["warnings"]
         assert "runner-service-inactive" not in status["blockers"]
         assert status["control"]["runner"]["runner_name"] == "aegis-ugreen-v2"
