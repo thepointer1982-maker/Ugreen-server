@@ -205,5 +205,39 @@ class ScoreEngineTests(unittest.TestCase):
         self.assertFalse(second["notification_recommended"])
 
 
+    def test_anomaly_score_lower_is_improvement(self):
+        p = self.verified(score=40, metric="anomaly_score", session="s1")
+        engine = self.engine()
+        engine.commit_baseline()
+        p.write_text(json.dumps({
+            "generated_at": NOW,
+            "export_session": "s2",
+            "evidence_class": "VERIFIED_EXPORT",
+            "anomaly_score": 20,
+            "devices": [],
+        }), encoding="utf-8")
+        self.write_manifest([p])
+        out = engine.scan()
+        rec = next(r for r in out["records"] if r["name"] == "anomaly_score")
+        self.assertEqual(rec["delta"], -20.0)
+        self.assertTrue(rec["counts_as_real_improvement"])
+        self.assertNotIn("NUMERIC_REGRESSION", rec["warning"] or "")
+
+    def test_device_array_scores_do_not_false_conflict(self):
+        p = self.write_json("scores/latest.json", {
+            "generated_at": NOW,
+            "export_session": "s1",
+            "evidence_class": "VERIFIED_EXPORT",
+            "network_score": 80,
+            "devices": [
+                {"id": "a", "score": 90},
+                {"id": "b", "score": 50},
+            ],
+        })
+        self.write_manifest([p])
+        out = self.engine().scan()
+        self.assertEqual(out["conflict_count"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
