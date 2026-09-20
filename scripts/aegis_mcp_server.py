@@ -28,6 +28,10 @@ from aegis_project_context import (
     read_state as project_context_impl,
     record_handoff as record_project_handoff_impl,
 )
+from aegis_worker_control import (
+    fleet_status as worker_fleet_status_impl,
+    wake as wake_worker_impl,
+)
 
 REPO_ROOT = Path(
     os.environ.get("AEGIS_REPO_ROOT", Path(__file__).resolve().parents[1])
@@ -56,13 +60,25 @@ LIFECYCLE_FILE = Path(
         Path.home() / ".local/state/aegis-lifecycle/status.json",
     )
 )
+LOCAL_MODELS_FILE = Path(
+    os.environ.get(
+        "AEGIS_LOCAL_MODEL_REGISTRY",
+        REPO_ROOT / "config" / "models" / "aegis-local-models.json",
+    )
+)
+VOICE_STATUS_FILE = Path(
+    os.environ.get(
+        "AEGIS_VOICE_STATUS_FILE",
+        Path.home() / ".local/state/aegis-voice/status.json",
+    )
+)
 
 mcp = MCPServer(
     "AEGIS Local Guardian",
     instructions=(
         "Local-first AEGIS diagnostics. Read status, local AI evidence, "
         "model scores, learning decisions, signed project continuity state, and "
-        "the shared AUTO-MAX-LOCAL autonomy policy. Channel handoffs preserve "
+        "the shared AUTO-MAX-LOCAL autonomy policy, local model registry, LAN workers, "
         "project/thread/style/pending-action identity. Autonomous work remains local, "
         "reversible and policy-gated; destructive/external effects remain blocked."
     ),
@@ -223,6 +239,36 @@ def lifecycle_resource() -> str:
     )
 
 
+@mcp.resource("aegis://models/local")
+def local_models_resource() -> str:
+    """Local-only model registry and routing policy."""
+    return json.dumps(
+        _read_json(LOCAL_MODELS_FILE, "missing"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.resource("aegis://workers")
+def workers_resource() -> str:
+    """Allowlisted LAN worker fleet status."""
+    return json.dumps(
+        worker_fleet_status_impl(),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.resource("aegis://voice")
+def voice_resource() -> str:
+    """Verified local Unix-socket voice bridge status."""
+    return json.dumps(
+        _verified_state(VOICE_STATUS_FILE, "not-yet-running"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -323,6 +369,30 @@ def primary_control_status() -> dict:
 def service_lifecycle_status() -> dict:
     """Return verified service age/version/integration audit state."""
     return _verified_state(LIFECYCLE_FILE, "not-yet-measured")
+
+
+@mcp.tool()
+def local_model_registry() -> dict:
+    """Return local-only Qwen/DeepSeek routing registry."""
+    return _read_json(LOCAL_MODELS_FILE, "missing")
+
+
+@mcp.tool()
+def worker_fleet_status() -> dict:
+    """Return allowlisted LAN worker configuration/status."""
+    return worker_fleet_status_impl()
+
+
+@mcp.tool()
+def wake_worker(worker_id: str) -> dict:
+    """Wake one explicitly enabled, allowlisted LAN worker by ID."""
+    return wake_worker_impl(worker_id)
+
+
+@mcp.tool()
+def voice_bridge_status() -> dict:
+    """Return verified local Unix-socket Alexa/voice bridge status."""
+    return _verified_state(VOICE_STATUS_FILE, "not-yet-running")
 
 
 @mcp.tool()
