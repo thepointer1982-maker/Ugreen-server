@@ -13,11 +13,17 @@ def main():
     assert "AEGIS_CODEX_OSS_WRAPPER" in s
     assert "AEGIS_CODEX_OSS_STATE_FILE" in s
     assert "AEGIS_ALLOW_CLOUD_CODEX" in s
+    assert "AEGIS_PROJECT_CONTEXT_REQUIRED" in s
+    assert "aegis_project_context.py" in s
+    assert "AEGIS AUTHORITATIVE PROJECT CONTEXT" in s
+    assert "project-context.json" in s
+    assert "Continue the existing project rather than starting a new project." in s
     assert "cloud Codex fallback is disabled" in s
     assert "CODEX_API_KEY CODEX_ACCESS_TOKEN" in s
     assert 'grep -Fq "Logged in using ChatGPT"' in s
     assert "codex exec --ignore-user-config --ephemeral --sandbox workspace-write" in s
-    assert '"$LOCAL_CODEX_WRAPPER" exec "$TASK"' in s
+    assert '"$LOCAL_CODEX_WRAPPER" exec "$FULL_TASK"' in s
+    assert 'opencode run --dir "$WORKTREE" --model "ollama/$LOCAL_MODEL" --agent build "$FULL_TASK"' in s
     assert "OPENCODE_DISABLE_AUTOUPDATE=1" in s
     assert "OPENCODE_DISABLE_MODELS_FETCH=1" in s
     assert "OPENCODE_DISABLE_DEFAULT_PLUGINS=1" in s
