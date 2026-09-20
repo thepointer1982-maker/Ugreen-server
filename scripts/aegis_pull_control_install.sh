@@ -25,17 +25,17 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=%h/.local/state/aegis-pull-control %h/.local/share/aegis-pull-control
+ReadWritePaths="$REPO_ROOT" %h/.local/state/aegis-pull-control %h/.local/share/aegis-pull-control
 EOF
 
 cat > "$UNIT_DIR/aegis-pull-control.timer" <<'EOF'
 [Unit]
-Description=Run AEGIS outbound pull control every 2 minutes
+Description=Run AEGIS outbound pull control every 5 minutes
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=2min
-AccuracySec=15s
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
 Persistent=true
 
 [Install]
