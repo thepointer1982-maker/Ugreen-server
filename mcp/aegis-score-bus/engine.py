@@ -289,6 +289,69 @@ def _safe_rel(path: Path, root: Path) -> str:
         return path.name
 
 
+EXPECTED_FILES = {
+    "ugreen-server": (
+        "scores/latest.json", "scores/deepdiag.json", "scores/history.jsonl",
+        "scores/network-score.json", "scores/export-session.json",
+        "scores/manifest.sha256", "dashboard/autocheck.json",
+    ),
+    "openjarvis-main": (
+        "aegis/quality/quality-gates.v1.json",
+        "aegis/a1-field-kit/manifest.v1.1.1.json",
+        "scores/real-a1-score-latest.json",
+        "scores/a3-decision-latest.json",
+    ),
+    "drive-datahub": ("02_Index", "03_Projekte", "06_Logs_Exports"),
+}
+
+
+def _repo_head(root: Path) -> str | None:
+    git = root / ".git"
+    if not git.exists():
+        return None
+    git_dir = git
+    if git.is_file():
+        try:
+            text = git.read_text(encoding="utf-8", errors="replace").strip()
+            if text.startswith("gitdir:"):
+                target = Path(text.split(":", 1)[1].strip())
+                git_dir = target if target.is_absolute() else (root / target).resolve()
+        except OSError:
+            return None
+    try:
+        head = (git_dir / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if re.fullmatch(r"[0-9a-fA-F]{40,64}", head):
+        return head.lower()
+    if not head.startswith("ref:"):
+        return None
+    ref = head.split(":", 1)[1].strip()
+    try:
+        value = (git_dir / ref).read_text(encoding="utf-8", errors="replace").strip()
+        if re.fullmatch(r"[0-9a-fA-F]{40,64}", value):
+            return value.lower()
+    except OSError:
+        pass
+    try:
+        packed = (git_dir / "packed-refs").read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
+        for line in packed:
+            if line.startswith("#") or line.startswith("^"):
+                continue
+            parts = line.split(" ", 1)
+            if (
+                len(parts) == 2
+                and parts[1].strip() == ref
+                and re.fullmatch(r"[0-9a-fA-F]{40,64}", parts[0])
+            ):
+                return parts[0].lower()
+    except OSError:
+        pass
+    return None
+
+
 class ScoreEngine:
     """Read score artifacts and maintain a sanitized comparison baseline.
 
@@ -301,10 +364,25 @@ class ScoreEngine:
         self.max_age_hours = max_age_hours
 
     def source_status(self) -> dict[str, Any]:
-        return {
-            name: {"path": str(path), "available": path.exists(), "is_dir": path.is_dir() if path.exists() else False}
-            for name, path in self.roots.items()
-        }
+        result: dict[str, Any] = {}
+        for name, path in self.roots.items():
+            checks = []
+            for rel in EXPECTED_FILES.get(name, ()):
+                candidate = path / rel
+                item: dict[str, Any] = {"path": rel, "exists": candidate.exists()}
+                if candidate.is_file():
+                    item["sha256"] = _sha256(candidate)
+                elif candidate.exists():
+                    item["kind"] = "directory"
+                checks.append(item)
+            result[name] = {
+                "path": str(path),
+                "available": path.exists(),
+                "is_dir": path.is_dir() if path.exists() else False,
+                "git_head": _repo_head(path),
+                "expected": checks,
+            }
+        return result
 
     def _files_for(self, source: str, root: Path) -> list[Path]:
         if not root.exists():
@@ -322,6 +400,22 @@ class ScoreEngine:
             if scores.is_dir():
                 files.update(scores.glob("*-score.json"))
                 files.update(scores.glob("*diag*.json"))
+            for sub in ("dashboard", "diagnostics", "diagnostic", "reports", "artifacts"):
+                base = root / sub
+                if not base.is_dir():
+                    continue
+                for p in base.rglob("*"):
+                    if (
+                        not p.is_file()
+                        or p.suffix.lower() not in {".json", ".jsonl", ".md"}
+                    ):
+                        continue
+                    lower = p.name.lower()
+                    if any(token in lower for token in (
+                        "score", "diag", "health", "a1", "a3", "recovery",
+                        "failover", "stability", "autonomy", "confidence", "learning"
+                    )):
+                        files.add(p)
         elif source == "openjarvis-main":
             for ext in ("*.json", "*.jsonl", "*.md"):
                 for p in root.rglob(ext):
@@ -375,7 +469,7 @@ class ScoreEngine:
             if not isinstance(doc, dict):
                 continue
             observed = _extract_times(doc)
-            commit = _extract_commit(doc)
+            commit = _extract_commit(doc) or _repo_head(root)
             export_session = _extract_export_session(doc)
             evidence = _classify(path, doc, hash_verified, export_session)
             freshness = _freshness(observed, self.max_age_hours)
