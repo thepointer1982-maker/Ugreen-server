@@ -1,0 +1,147 @@
+{
+  "schema": "aegis-incident/v1",
+  "id": "lenovopointer-windows11-black-screen",
+  "device": "lenovopointer",
+  "os": "Windows 11",
+  "status": "instrumented-awaiting-real-failure-evidence",
+  "observed": {
+    "phase": "shortly-after-Windows-start-or-login",
+    "echo_studio_connection": "Bluetooth or Wi-Fi observed shortly before black screen",
+    "black_screen": true,
+    "causal_link_to_echo_studio": "not-proven",
+    "fingerprint_power_button": "thumb/fingerprint button used immediately before sign-in transition; exact Lenovo hardware integration to be confirmed by collector",
+    "codex_working_on_laptop": "yes; diagnostic and repair paths must not terminate Codex",
+    "iphone_usb_c_connected": "yes; treated as correlation evidence only, not proven causal"
+  },
+  "hypotheses": [
+    {
+      "id": "windows-hello-fingerprint-power-wake-transition",
+      "priority": 1,
+      "evidence": [
+        "Biometrics/Operational",
+        "event 1108",
+        "WbioSrvc",
+        "bioiso/ngciso",
+        "biometric PnP/driver",
+        "pre-login SYSTEM snapshots",
+        "Modern Standby/Wake-on-Touch indicators"
+      ]
+    },
+    {
+      "id": "gpu-display-driver-tdr",
+      "priority": 2,
+      "evidence": [
+        "Display/4101",
+        "LiveKernelReports",
+        "graphics reset restores image"
+      ]
+    },
+    {
+      "id": "dwm-explorer-winlogon-transition",
+      "priority": 3,
+      "evidence": [
+        "Winlogon/Shell config",
+        "dwm/explorer/userinit/logonui events/process state"
+      ]
+    },
+    {
+      "id": "bluetooth-wifi-combo-driver-conflict",
+      "priority": 4,
+      "evidence": [
+        "BTHUSB/Bluetooth/WLAN/Netwtw events near failure",
+        "Echo isolation A/B"
+      ]
+    },
+    {
+      "id": "usb-c-apple-pnp-transition",
+      "priority": 5,
+      "evidence": [
+        "Apple/iPhone USB PnP presence",
+        "USBHUB3/USBXHCI/Kernel-PnP warnings near failure"
+      ]
+    },
+    {
+      "id": "fast-startup-hybrid-state",
+      "priority": 6,
+      "evidence": [
+        "restart vs shutdown/power-on difference",
+        "HiberbootEnabled"
+      ]
+    }
+  ],
+  "safety": {
+    "default": "collect-only",
+    "forbidden": [
+      "partition changes",
+      "formatting",
+      "bootloader or EFI edits",
+      "automatic BIOS changes",
+      "automatic display-driver uninstall",
+      "automatic Windows Hello enrollment removal"
+    ],
+    "preserve_processes": [
+      "codex",
+      "node",
+      "python",
+      "pwsh",
+      "powershell"
+    ]
+  },
+  "cost": "free-built-in-Windows-tools-only",
+  "next_gate": "deploy tested bootstrap on the physical Lenovo laptop; reproduce one startup/login failure; evaluate repeated time-correlated evidence through the local resolver/supervisor; only then use evidence-supported reversible A/B isolation for fingerprint, Echo, or Fast Startup",
+  "implementation": {
+    "collector": "windows/Collect-LenovoPointerBlackScreen.ps1",
+    "logon_watcher": "windows/Watch-LenovoPointerBlackScreen.ps1",
+    "watcher_installer": "windows/Install-LenovoPointerBlackScreenWatch.ps1",
+    "reversible_repair": "windows/Repair-LenovoPointerBlackScreen.ps1",
+    "one_command_bootstrap": "windows/Bootstrap-LenovoPointerBlackScreen.ps1",
+    "documentation": "docs/lenovopointer-black-screen.md",
+    "prelogin_watcher": "windows/Watch-LenovoPointerBlackScreenBoot.ps1",
+    "reversible_fingerprint_gate": "windows/Repair-LenovoPointerBlackScreen.ps1 -Action ApplyFingerprintIsolation -ConfirmAlternativeSignIn",
+    "safe_recovery": "windows/Recover-LenovoPointerBlackScreen.ps1",
+    "evidence_resolver": "windows/Resolve-LenovoPointerBlackScreen.ps1",
+    "autonomous_supervisor": "windows/Supervise-LenovoPointerBlackScreen.ps1",
+    "autonomous_policy": "local fail-closed loop: collect -> score -> observe -> only safe Explorer recovery -> collect -> compare -> cooldown on regression"
+  },
+  "validation": {
+    "workflow": "AEGIS Autocheck",
+    "run_number": 215,
+    "conclusion": "success",
+    "tested_code_head": "dd0eda9a4b98d5ed8ad64da27ca1d08138011190",
+    "powershell_parser": "success",
+    "safety_regression": "success",
+    "windows_hello_ess_evidence_path": "success",
+    "temporal_correlation_path": "success",
+    "safe_recovery_path": "success",
+    "resolver_repeat_score_gate": "success",
+    "autonomous_supervisor_path": "success",
+    "supervisor_lock_cooldown_guard": "success",
+    "codex_preservation_contract": "success",
+    "usb_c_observation_path": "success"
+  },
+  "autonomy": {
+    "level": "safe-local-self-healing-ready",
+    "automatic_actions": [
+      "collect evidence",
+      "score repeated evidence",
+      "start missing explorer.exe",
+      "post-repair validation",
+      "cooldown/circuit-breaker"
+    ],
+    "gated_actions": [
+      "fingerprint isolation",
+      "Windows Biometric Service restart",
+      "Echo audio isolation",
+      "Fast Startup change",
+      "display driver update/rollback"
+    ],
+    "forbidden_automatic_actions": [
+      "driver uninstall",
+      "Windows Hello enrollment deletion",
+      "EFI/boot edits",
+      "partition changes",
+      "BIOS/firmware changes",
+      "Codex termination"
+    ]
+  }
+}
