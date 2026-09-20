@@ -45,8 +45,11 @@ def main() -> None:
         outbin = temp / "bin"
         home = temp / "codex-home"
         state = temp / "state"
+        mcp_wrapper = temp / "aegis-mcp-local"
         fakebin.mkdir()
         outbin.mkdir()
+        mcp_wrapper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        mcp_wrapper.chmod(0o755)
 
         make_exe(
             fakebin / "codex",
@@ -68,6 +71,7 @@ def main() -> None:
         env["AEGIS_LOCAL_BIN_DIR"] = str(outbin)
         env["AEGIS_CODEX_OSS_HOME"] = str(home)
         env["AEGIS_CODEX_OSS_STATE_DIR"] = str(state)
+        env["AEGIS_MCP_WRAPPER"] = str(mcp_wrapper)
         env["AEGIS_ALLOW_MODEL_DOWNLOAD"] = "1"
         env["AEGIS_ALLOW_CODEX_INSTALL"] = "0"
         env["OPENAI_API_KEY"] = "must-never-be-forwarded"
@@ -82,6 +86,16 @@ def main() -> None:
             timeout=30,
         )
         assert cp.returncode == 0, cp.stderr
+
+        generated_profile = (home / "aegis-local.config.toml").read_text(encoding="utf-8")
+        assert "[mcp_servers.aegis_local]" in generated_profile
+        assert f'command = "{mcp_wrapper}"' in generated_profile
+        assert f'cwd = "{ROOT}"' in generated_profile
+        assert "required = true" in generated_profile
+        assert "startup_timeout_sec = 3" in generated_profile
+        assert "tool_timeout_sec = 10" in generated_profile
+        assert '"project_context"' in generated_profile
+        assert '"record_project_handoff"' in generated_profile
 
         wrapper = (outbin / "aegis-codex-local").read_text(encoding="utf-8")
         assert f'export CODEX_HOME="{home}"' in wrapper
@@ -102,6 +116,8 @@ def main() -> None:
         assert data["openai_api_key_required"] is False
         assert data["web_search"] == "disabled"
         assert data["shell_network_access"] is False
+        assert data["mcp_attached"] is True
+        assert Path(data["mcp_wrapper"]) == mcp_wrapper
         assert Path(data["isolated_codex_home"]) == home
 
     print("AEGIS CODEX OSS TESTS PASS")
