@@ -22,10 +22,13 @@ def main():
     assert "codex-local" in text
     assert "aegis_coder_boot_install.sh" in text
     assert "aegis_docker_efficiency_install.sh" in text
+    assert "aegis_autonomy_install.sh" in text
+    assert "AUTO-MAX-LOCAL" in (ROOT / "config" / "autonomy" / "aegis-max-local.json").read_text(encoding="utf-8")
     assert "docker_efficiency=$DOCKER_EFFICIENCY_STATUS" in text
     assert "mcp_runtime=$MCP_STATUS" in text
     assert "codex_oss=$CODEX_OSS_STATUS" in text
     assert "coder_boot_guardian=$CODER_BOOT_STATUS" in text
+    assert "autonomy=$AUTONOMY_STATUS" in text
     assert "aegis_pull_control.py --repo-root" in text
     assert "aegis-pull-control/state.json" in text
     assert "aegis_runner_install.sh" in text
@@ -33,6 +36,7 @@ def main():
     assert "aegis_access_bootstrap.sh runner" not in text
     assert 'RUNNER_STATUS="skipped"' in text
     assert "runner_return_channel=$RUNNER_STATUS" in text
+    assert text.index('DOCKER_EFFICIENCY_STATUS="skipped"') < text.index('echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"')
     assert "AEGIS_RUNNER_TOKEN" not in text
     assert "TS_AUTHKEY" not in text
     print("AEGIS ZERO COST BOOTSTRAP TESTS PASS")
