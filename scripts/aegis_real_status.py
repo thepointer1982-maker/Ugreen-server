@@ -173,6 +173,12 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-pull-control" / "state.json",
         )
     )
+    lifecycle_file = Path(
+        os.environ.get(
+            "AEGIS_LIFECYCLE_STATE_FILE",
+            home_state / "aegis-lifecycle" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -185,6 +191,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     docker_efficiency = read_json(docker_efficiency_file)
     autonomy = read_json(autonomy_file)
     pull_control = read_json(pull_control_file)
+    lifecycle = read_json(lifecycle_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -203,6 +210,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     docker_timer = systemd_status("aegis-docker-efficiency.timer")
     autonomy_timer = systemd_status("aegis-autonomy.timer")
     pull_control_timer = systemd_status("aegis-pull-control.timer")
+    lifecycle_timer = systemd_status("aegis-lifecycle.timer")
 
     health = "healthy"
     blockers: list[str] = []
@@ -316,6 +324,36 @@ def build_status(repo: Path) -> dict[str, Any]:
         health = "degraded"
         blockers.append("autonomy-status-missing")
 
+    lifecycle_ok = False
+    lifecycle_reason = "missing"
+    if lifecycle:
+        lifecycle_ok, lifecycle_reason = verify_provenance(lifecycle)
+        if not lifecycle_ok:
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("lifecycle-provenance-invalid")
+        elif lifecycle.get("health") == "blocked":
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("lifecycle-required-service-gap")
+        elif lifecycle.get("health") == "degraded":
+            warnings.append("lifecycle-review-needed")
+    elif (
+        lifecycle_timer.get("available")
+        and lifecycle_timer.get("LoadState") == "loaded"
+        and lifecycle_timer.get("ActiveState") == "active"
+    ):
+        warnings.append("lifecycle-not-yet-audited")
+
+    if (
+        lifecycle_timer.get("available")
+        and lifecycle_timer.get("LoadState") == "loaded"
+        and lifecycle_timer.get("ActiveState") != "active"
+    ):
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("lifecycle-timer-inactive")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -350,6 +388,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "docker_efficiency_timer": docker_timer,
                 "autonomy_timer": autonomy_timer,
                 "pull_control_timer": pull_control_timer,
+                "lifecycle_timer": lifecycle_timer,
             },
             "control": {
                 "primary": {
@@ -444,6 +483,21 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "policy": autonomy.get("policy"),
                     "systemd_timer": autonomy_timer,
                 },
+                "lifecycle": {
+                    "health": lifecycle.get("health"),
+                    "blocked": lifecycle.get("blocked"),
+                    "legacy": lifecycle.get("legacy"),
+                    "review": lifecycle.get("review"),
+                    "baseline": lifecycle.get("baseline"),
+                    "integration_coverage": lifecycle.get(
+                        "integration_coverage"
+                    ),
+                    "provenance_verified": (
+                        lifecycle_ok if lifecycle else None
+                    ),
+                    "provenance_reason": lifecycle_reason,
+                    "systemd_timer": lifecycle_timer,
+                },
             },
             "ollama": {
                 "reachable": ollama.get("reachable"),
@@ -498,6 +552,10 @@ def build_status(repo: Path) -> dict[str, Any]:
                 ),
                 "pull_control": file_state(
                     pull_control_file,
+                    verify=True,
+                ),
+                "lifecycle": file_state(
+                    lifecycle_file,
                     verify=True,
                 ),
             },
