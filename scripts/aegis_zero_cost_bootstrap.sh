@@ -46,6 +46,23 @@ echo "head=$HEAD_SHA"
 echo "=== AEGIS PRIMARY ZERO-COST CONTROL ==="
 bash scripts/aegis_pull_control_install.sh
 
+echo "=== AEGIS CODER BOOT GUARDIAN ==="
+CODER_BOOT_STATUS="skipped"
+if systemctl --user show-environment >/dev/null 2>&1; then
+  set +e
+  AEGIS_CODER_PREFER="${AEGIS_CODER_PREFER:-local}" bash scripts/aegis_coder_boot_install.sh
+  coder_boot_rc=$?
+  set -e
+  if [[ "$coder_boot_rc" -eq 0 ]]; then
+    CODER_BOOT_STATUS="active"
+  else
+    CODER_BOOT_STATUS="failed:$coder_boot_rc"
+  fi
+else
+  CODER_BOOT_STATUS="user-systemd-unavailable"
+fi
+echo "coder_boot_guardian=$CODER_BOOT_STATUS"
+
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
 if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
@@ -85,4 +102,5 @@ if [[ "$rc" -ne 0 ]]; then
 fi
 
 echo "AEGIS zero-cost pull control active."
+echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
