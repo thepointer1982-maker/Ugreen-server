@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("Status","PlanEchoIsolation","ApplyEchoIsolation","RestoreEcho","PlanFingerprintIsolation","ApplyFingerprintIsolation","RestoreFingerprint","RestartBiometricService","DisableFastStartup","RestoreFastStartup","RestartExplorer")]
+  [ValidateSet("Status","PlanEchoIsolation","ApplyEchoIsolation","RestoreEcho","PlanEchoAudioIsolation","ApplyEchoAudioIsolation","RestoreEchoAudio","PlanFingerprintIsolation","ApplyFingerprintIsolation","RestoreFingerprint","RestartBiometricService","DisableFastStartup","RestoreFastStartup","RestartExplorer")]
   [string]$Action = "Status",
   [switch]$ConfirmAlternativeSignIn
 )
@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $Root = Join-Path $env:LOCALAPPDATA "AEGIS\LenovoPointer\BlackScreen"
 $StateDir = Join-Path $Root "repair-state"
 $EchoState = Join-Path $StateDir "echo-isolation.json"
+$EchoAudioState = Join-Path $StateDir "echo-audio-isolation.json"
 $FingerprintState = Join-Path $StateDir "fingerprint-isolation.json"
 $FastState = Join-Path $StateDir "fast-startup.json"
 New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
@@ -26,6 +27,16 @@ function Get-EchoDevices {
   if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) { return @() }
   @(Get-PnpDevice -ErrorAction SilentlyContinue |
     Where-Object { $_.FriendlyName -match "(?i)Echo Studio|Amazon Echo|Echo" } |
+    Select-Object Status, Class, FriendlyName, InstanceId, Problem)
+}
+
+function Get-EchoAudioDevices {
+  if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) { return @() }
+  @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.FriendlyName -match "(?i)Echo Studio|Amazon Echo|Echo" -and
+      $_.Class -in @("AudioEndpoint","Media","Bluetooth")
+    } |
     Select-Object Status, Class, FriendlyName, InstanceId, Problem)
 }
 
@@ -56,12 +67,14 @@ function Write-State {
   $Value | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
-if ($Action -eq "Status" -or $Action -eq "PlanEchoIsolation" -or $Action -eq "PlanFingerprintIsolation") {
+if ($Action -eq "Status" -or $Action -eq "PlanEchoIsolation" -or $Action -eq "PlanEchoAudioIsolation" -or $Action -eq "PlanFingerprintIsolation") {
   [pscustomobject]@{
     action = $Action
     admin = (Test-Admin)
     echo_candidates = @(Get-EchoDevices)
     echo_backup_exists = (Test-Path -LiteralPath $EchoState)
+    echo_audio_candidates = @(Get-EchoAudioDevices)
+    echo_audio_backup_exists = (Test-Path -LiteralPath $EchoAudioState)
     fingerprint_candidates = @(Get-FingerprintDevices)
     fingerprint_drivers = @(Get-FingerprintDrivers)
     fingerprint_backup_exists = (Test-Path -LiteralPath $FingerprintState)
@@ -115,6 +128,66 @@ if ($Action -eq "RestoreEcho") {
   $state | Add-Member -NotePropertyName restored_at -NotePropertyValue (Get-Date).ToString("o") -Force
   Write-State $EchoState $state
   [pscustomobject]@{ status="restored"; backup=$EchoState } | ConvertTo-Json
+  exit 0
+}
+
+if ($Action -eq "ApplyEchoAudioIsolation") {
+  Require-Admin
+  if (-not (Get-Command Disable-PnpDevice -ErrorAction SilentlyContinue)) { throw "Disable-PnpDevice is unavailable." }
+  if (Test-Path -LiteralPath $EchoAudioState) {
+    $existing = Get-Content -LiteralPath $EchoAudioState -Raw | ConvertFrom-Json
+    if ($existing.active -eq $true) {
+      [pscustomobject]@{ status="already-applied"; backup=$EchoAudioState; device_count=@($existing.devices).Count } | ConvertTo-Json
+      exit 0
+    }
+  }
+
+  $devices = @(Get-EchoAudioDevices)
+  if ($devices.Count -eq 0) {
+    throw "No Echo Studio AudioEndpoint/Media/Bluetooth endpoints were found. Nothing changed."
+  }
+
+  $state = [ordered]@{
+    schema = "aegis-echo-audio-isolation/v1"
+    applied_at = (Get-Date).ToString("o")
+    active = $true
+    classes = @("AudioEndpoint","Media","Bluetooth")
+    devices = @($devices)
+  }
+  Write-State $EchoAudioState $state
+
+  foreach ($d in $devices) {
+    if ($d.Status -eq "OK") {
+      Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop
+    }
+  }
+
+  [pscustomobject]@{
+    status = "applied"
+    backup = $EchoAudioState
+    device_count = $devices.Count
+    note = "Only Echo-like AudioEndpoint/Media/Bluetooth endpoints were disabled. Wi-Fi, biometric devices, and Codex were not touched."
+  } | ConvertTo-Json -Depth 4
+  exit 0
+}
+
+if ($Action -eq "RestoreEchoAudio") {
+  Require-Admin
+  if (-not (Get-Command Enable-PnpDevice -ErrorAction SilentlyContinue)) { throw "Enable-PnpDevice is unavailable." }
+  if (-not (Test-Path -LiteralPath $EchoAudioState)) { throw "Echo audio isolation backup not found." }
+
+  $state = Get-Content -LiteralPath $EchoAudioState -Raw | ConvertFrom-Json
+  foreach ($d in @($state.devices)) {
+    if ($d.Status -eq "OK" -and $d.InstanceId) {
+      Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Continue
+    }
+  }
+
+  $state.active = $false
+  $state | Add-Member -NotePropertyName restored_at -NotePropertyValue (Get-Date).ToString("o") -Force
+  Write-State $EchoAudioState $state
+
+  [pscustomobject]@{ status="restored"; backup=$EchoAudioState } | ConvertTo-Json
   exit 0
 }
 
