@@ -350,6 +350,7 @@ def create_backup() -> dict[str, Any]:
                     recursive=False,
                     filter=lambda info: _sanitize_tarinfo(info),
                 )
+        proc.stdin.close()
         stderr = proc.stderr.read().decode("utf-8", errors="replace") if proc.stderr else ""
         rc = proc.wait()
         if rc != 0:
