@@ -34,7 +34,10 @@ local_ready() {
 }
 
 codex_ready() {
-  command -v codex >/dev/null 2>&1
+  command -v codex >/dev/null 2>&1 || return 1
+  local status
+  status="$(codex login status 2>&1 || true)"
+  grep -Fq "Logged in using ChatGPT" <<<"$status"
 }
 
 case "$MODE" in
@@ -42,7 +45,7 @@ case "$MODE" in
     if local_ready; then MODE="local"; elif codex_ready; then MODE="codex"; else echo "blocked: neither local OpenCode/Ollama nor Codex CLI is ready" >&2; exit 5; fi
     ;;
   local) local_ready || { echo "blocked: OpenCode/Ollama local stack not ready" >&2; exit 5; } ;;
-  codex) codex_ready || { echo "blocked: Codex CLI not installed" >&2; exit 5; } ;;
+  codex) codex_ready || { echo "blocked: Codex CLI must be logged in using ChatGPT; API-key auth is not allowed in zero-extra-cost mode" >&2; exit 5; } ;;
   *) echo "invalid mode: $MODE" >&2; exit 2 ;;
 esac
 
@@ -64,6 +67,11 @@ else
     cd "$WORKTREE"
     unset OPENAI_API_KEY
     unset OPENAI_ORG_ID
+    unset OPENAI_PROJECT_ID
+    codex login status 2>&1 | grep -Fq "Logged in using ChatGPT" || {
+      echo "blocked: Codex is not authenticated with ChatGPT" >&2
+      exit 5
+    }
     codex exec --ephemeral --sandbox workspace-write "$TASK"
   ) >"$REPORT/agent.stdout" 2>"$REPORT/agent.stderr"
   rc=$?
