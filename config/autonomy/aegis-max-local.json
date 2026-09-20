@@ -1,0 +1,76 @@
+{
+  "schema": "aegis-autonomy-policy/v1",
+  "profile": "AUTO-MAX-LOCAL",
+  "revision": 1,
+  "objective": "Maximum local AEGIS autonomy with reversible self-healing, local model routing, project continuity, measured gates, provenance and fail-closed boundaries.",
+  "default_mode": "autonomous",
+  "local_first": true,
+  "recurring_cloud_ai_cost_allowed": false,
+  "model_specific_memory_required": false,
+  "cycle": {
+    "interval_seconds": 120,
+    "max_actions_per_cycle": 4,
+    "max_consecutive_failed_cycles": 3,
+    "circuit_breaker_seconds": 900,
+    "action_cooldown_seconds": 300
+  },
+  "automatic_capabilities": {
+    "observe_and_measure": true,
+    "plan_and_prioritize": true,
+    "select_local_model": true,
+    "switch_local_model": true,
+    "continue_project_context": true,
+    "create_isolated_git_worktree": true,
+    "edit_project_files_in_worktree": true,
+    "run_tests_and_validation": true,
+    "record_structured_handoff": true,
+    "mine_local_learning_data": true,
+    "evaluate_learning_gate": true,
+    "promote_only_after_probation": true,
+    "rollback_last_known_good_on_regression": true,
+    "restart_allowlisted_aegis_user_services": true,
+    "start_allowlisted_aegis_timers": true,
+    "docker_readonly_health_and_compose_validation": true,
+    "docker_restart_only_if_explicit_autorepair_label": true,
+    "retry_transient_local_failures_with_backoff": true
+  },
+  "allowlisted_user_units": [
+    "aegis-export.timer",
+    "aegis-pull-control.timer",
+    "aegis-coder-boot.timer",
+    "aegis-docker-efficiency.timer",
+    "aegis-github-runner.service",
+    "aegis-autonomy.timer"
+  ],
+  "docker_autorepair": {
+    "required_label": "aegis.autorepair=true",
+    "minimum_consecutive_unhealthy_checks": 3,
+    "cooldown_seconds": 900,
+    "max_restarts_per_container_per_hour": 2,
+    "pull_image": false,
+    "recreate_container": false,
+    "prune": false,
+    "mutate_volumes": false
+  },
+  "hard_blocks": [
+    "delete_user_data",
+    "format_or_partition_storage",
+    "delete_docker_volumes",
+    "docker_prune",
+    "change_secrets_or_credentials",
+    "change_repository_visibility",
+    "open_router_or_firewall_ports",
+    "enable_public_remote_access",
+    "enable_paid_cloud_ai",
+    "firmware_flash",
+    "arbitrary_root_shell",
+    "disable_security_controls"
+  ],
+  "evidence_contract": {
+    "real_hardware_claims_require_measured_evidence": true,
+    "changes_require_before_after": true,
+    "failed_validation_requires_rollback_or_block": true,
+    "provenance_required": true,
+    "no_silent_context_reset": true
+  }
+}
