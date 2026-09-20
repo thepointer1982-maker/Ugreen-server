@@ -30,6 +30,8 @@ def main() -> None:
         os.environ["AEGIS_LKG_STATE_DIR"] = str(root / "state" / "aegis-last-known-good")
         os.environ["AEGIS_CODER_BOOT_STATE_FILE"] = str(root / "state" / "aegis-coder-boot" / "status.json")
         os.environ["AEGIS_CODEX_OSS_STATE_FILE"] = str(root / "state" / "aegis-codex-oss" / "status.json")
+        os.environ["AEGIS_MCP_STATE_FILE"] = str(root / "state" / "aegis-mcp" / "runtime.json")
+        os.environ["AEGIS_RUNNER_STATE_FILE"] = str(root / "state" / "aegis-runner" / "status.json")
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -38,6 +40,8 @@ def main() -> None:
             root / "state" / "aegis-scheduler",
             root / "state" / "aegis-coder-boot",
             root / "state" / "aegis-codex-oss",
+            root / "state" / "aegis-mcp",
+            root / "state" / "aegis-runner",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +91,7 @@ def main() -> None:
                     "reason": "codex-oss-ollama-ready",
                     "selected": "codex-local",
                     "codex_local": {"ready": True, "provider": "ollama"},
-                    "codex_cloud": {"ready": True, "auth": "chatgpt", "automatic_fallback_allowed": False},
+                    "codex_cloud": {"ready": False, "auth": "skipped", "automatic_fallback_allowed": False},
                     "opencode_local": {"ready": True},
                 }
             ),
@@ -109,6 +113,34 @@ def main() -> None:
                     "openai_api_key_required": False,
                     "web_search": "disabled",
                     "shell_network_access": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "state" / "aegis-mcp" / "runtime.json").write_text(
+            json.dumps(
+                {
+                    "schema": "aegis-mcp-runtime/v1",
+                    "health": "healthy",
+                    "reason": "mcp-runtime-ready",
+                    "transport": "stdio",
+                    "network_listener": False,
+                    "public_port": False,
+                    "wrapper": "/home/aegis/.local/bin/aegis-mcp-local",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (root / "state" / "aegis-runner" / "status.json").write_text(
+            json.dumps(
+                {
+                    "schema": "aegis-runner/v2",
+                    "configured": True,
+                    "service_mode": "user-systemd",
+                    "service_active": True,
+                    "runner_name": "aegis-ugreen-v2",
+                    "labels": ["aegis-ugreen-v2"],
                 }
             ),
             encoding="utf-8",
@@ -137,6 +169,13 @@ def main() -> None:
         assert status["coder"]["codex_oss"]["cloud_model_usage"] is False
         assert status["coder"]["codex_oss"]["openai_api_key_required"] is False
         assert status["coder"]["codex_oss"]["web_search"] == "disabled"
+        assert status["control"]["mcp"]["health"] == "healthy"
+        assert status["control"]["mcp"]["transport"] == "stdio"
+        assert status["control"]["mcp"]["network_listener"] is False
+        assert status["control"]["mcp"]["public_port"] is False
+        assert status["control"]["runner"]["configured"] is True
+        assert status["control"]["runner"]["service_active"] is True
+        assert status["control"]["runner"]["runner_name"] == "aegis-ugreen-v2"
         assert status["_provenance"]["kind"] == "real-status"
 
     print("AEGIS REAL STATUS TESTS PASS")
