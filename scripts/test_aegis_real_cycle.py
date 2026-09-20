@@ -50,11 +50,31 @@ def main() -> None:
 
         write(
             scripts / "aegis_nas_bootstrap.sh",
-            "#!/usr/bin/env bash\nexit 0\n",
+            """#!/usr/bin/env bash
+set -e
+mkdir -p "$AEGIS_STATE_DIR"
+python3 - "$AEGIS_STATE_DIR/preflight.json" "$2" "$AEGIS_TEST_SOURCE_ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+out, repo, source = sys.argv[1:4]
+Path(out).write_text(json.dumps({
+    "status": "ready",
+    "repo_root": str(Path(repo).resolve()),
+    "blockers": [],
+    "source": {"status": "ready", "root": source},
+    "git": {"is_repo": True},
+}), encoding="utf-8")
+PY
+exit 0
+""",
         )
         write(
             scripts / "aegis_nas_run_once.sh",
-            "#!/usr/bin/env bash\nexit 0\n",
+            """#!/usr/bin/env bash
+set -e
+printf '%s' "${AEGIS_SOURCE_ROOT:-}" > "$AEGIS_TEST_SOURCE_CAPTURE"
+exit 0
+""",
         )
         write(
             scripts / "aegis_local_ai_miner.py",
@@ -85,14 +105,26 @@ raise SystemExit(0)
 from pathlib import Path
 state=Path(os.environ["AEGIS_GUARDIAN_STATE_DIR"])
 state.mkdir(parents=True, exist_ok=True)
+Path(os.environ["AEGIS_TEST_GUARDIAN_CAPTURE"]).write_text(
+    os.environ.get("AEGIS_GUARDIAN_REUSE_PREFLIGHT", ""),
+    encoding="utf-8",
+)
 (state/"status.json").write_text(json.dumps({"mode":"healthy","reason":"verified-cycle"}), encoding="utf-8")
 """,
         )
 
         env = os.environ.copy()
+        source_root = root / "source"
+        source_root.mkdir()
+        source_capture = root / "source-capture"
+        guardian_capture = root / "guardian-capture"
         env["AEGIS_REAL_CYCLE_STATE_DIR"] = str(root / "real")
         env["AEGIS_AI_MINER_STATE_DIR"] = str(root / "ai")
         env["AEGIS_GUARDIAN_STATE_DIR"] = str(root / "guardian")
+        env["AEGIS_STATE_DIR"] = str(root / "bootstrap-state")
+        env["AEGIS_TEST_SOURCE_ROOT"] = str(source_root)
+        env["AEGIS_TEST_SOURCE_CAPTURE"] = str(source_capture)
+        env["AEGIS_TEST_GUARDIAN_CAPTURE"] = str(guardian_capture)
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--repo-root", str(repo)],
             text=True,
@@ -106,6 +138,10 @@ state.mkdir(parents=True, exist_ok=True)
         assert summary["miner_provenance"]["verified"] is True
         assert summary["steps"]["guardian"]["rc"] == 0
         assert summary["steps"]["real_status"]["rc"] == 0
+        assert summary["source_reuse"]["used_for_export"] is True
+        assert summary["source_reuse"]["root"] == str(source_root)
+        assert source_capture.read_text(encoding="utf-8") == str(source_root)
+        assert guardian_capture.read_text(encoding="utf-8") == "1"
         assert summary["_provenance"]["kind"] == "real-cycle"
 
     print("AEGIS REAL CYCLE TESTS PASS")
