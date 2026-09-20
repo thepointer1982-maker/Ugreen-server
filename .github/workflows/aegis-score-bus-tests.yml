@@ -1,0 +1,30 @@
+name: AEGIS Score Bus Tests
+
+on:
+  push:
+    paths:
+      - "mcp/aegis-score-bus/**"
+      - ".github/workflows/aegis-score-bus-tests.yml"
+  pull_request:
+    paths:
+      - "mcp/aegis-score-bus/**"
+      - ".github/workflows/aegis-score-bus-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  score-bus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        working-directory: mcp/aegis-score-bus
+        run: python -m py_compile engine.py server.py test_engine.py
+      - name: Engine contracts
+        working-directory: mcp/aegis-score-bus
+        run: python -m unittest -v test_engine.py
