@@ -1,12 +1,12 @@
 {
   "schema": "aegis-iphone-bootstrap/v1",
-  "trusted_sha": "21a255a15b898a680fc9beecdd977f2c95348be7",
-  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/21a255a15b898a680fc9beecdd977f2c95348be7/scripts/aegis_zero_cost_bootstrap.sh",
-  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/21a255a15b898a680fc9beecdd977f2c95348be7/scripts/aegis_shortcuts_remote_launcher.sh",
-  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/21a255a15b898a680fc9beecdd977f2c95348be7/scripts/aegis_iphone_ashell_bootstrap.sh",
-  "control_sequence": 22,
+  "trusted_sha": "9e40d8fcead11ac1508aa7a867801f41a68a796f",
+  "bootstrap_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/9e40d8fcead11ac1508aa7a867801f41a68a796f/scripts/aegis_zero_cost_bootstrap.sh",
+  "shortcuts_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/9e40d8fcead11ac1508aa7a867801f41a68a796f/scripts/aegis_shortcuts_remote_launcher.sh",
+  "ashell_launcher_url": "https://raw.githubusercontent.com/thepointer1982-maker/Ugreen-server/9e40d8fcead11ac1508aa7a867801f41a68a796f/scripts/aegis_iphone_ashell_bootstrap.sh",
+  "control_sequence": 23,
   "action": "bootstrap-zero-cost-control",
   "nas_lan_host": "192.168.178.55",
   "ssh_port": 22,
-  "notes": "Sequence 22 integrates guarded modern OpenCode fallback, task-aware local model routing between Qwen2.5-Coder 7B and preinstalled DeepSeek R1 8B, fail-closed allowlisted LAN Wake-on-LAN worker control, and a local-only Unix-socket Alexa/voice bridge. No optional model auto-download, no arbitrary worker targets, no TCP/public voice listener, cloud AI remains disabled by default."
+  "notes": "Privacy-first zero-cost gate: private-repo CI routes to free UGREEN self-hosted runner; GitHub-hosted CI disabled when private; runtime logs/models/voice/secrets stay local; cloud AI disabled by default; Sequence 22 integrations retained."
 }
