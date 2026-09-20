@@ -8,28 +8,65 @@
     "phase": "shortly-after-Windows-start-or-login",
     "echo_studio_connection": "Bluetooth or Wi-Fi observed shortly before black screen",
     "black_screen": true,
-    "causal_link_to_echo_studio": "not-proven"
+    "causal_link_to_echo_studio": "not-proven",
+    "fingerprint_power_button": "thumb/fingerprint button used immediately before sign-in transition; exact Lenovo hardware integration to be confirmed by collector",
+    "codex_working_on_laptop": "yes; diagnostic and repair paths must not terminate Codex",
+    "iphone_usb_c_connected": "yes; treated as correlation evidence only, not proven causal"
   },
   "hypotheses": [
     {
+      "id": "windows-hello-fingerprint-power-wake-transition",
+      "priority": 1,
+      "evidence": [
+        "Biometrics/Operational",
+        "event 1108",
+        "WbioSrvc",
+        "bioiso/ngciso",
+        "biometric PnP/driver",
+        "pre-login SYSTEM snapshots",
+        "Modern Standby/Wake-on-Touch indicators"
+      ]
+    },
+    {
       "id": "gpu-display-driver-tdr",
-      "priority": 1
+      "priority": 2,
+      "evidence": [
+        "Display/4101",
+        "LiveKernelReports",
+        "graphics reset restores image"
+      ]
     },
     {
-      "id": "dwm-explorer-shell-failure",
-      "priority": 2
-    },
-    {
-      "id": "display-output-topology-switch",
-      "priority": 3
+      "id": "dwm-explorer-winlogon-transition",
+      "priority": 3,
+      "evidence": [
+        "Winlogon/Shell config",
+        "dwm/explorer/userinit/logonui events/process state"
+      ]
     },
     {
       "id": "bluetooth-wifi-combo-driver-conflict",
-      "priority": 4
+      "priority": 4,
+      "evidence": [
+        "BTHUSB/Bluetooth/WLAN/Netwtw events near failure",
+        "Echo isolation A/B"
+      ]
+    },
+    {
+      "id": "usb-c-apple-pnp-transition",
+      "priority": 5,
+      "evidence": [
+        "Apple/iPhone USB PnP presence",
+        "USBHUB3/USBXHCI/Kernel-PnP warnings near failure"
+      ]
     },
     {
       "id": "fast-startup-hybrid-state",
-      "priority": 5
+      "priority": 6,
+      "evidence": [
+        "restart vs shutdown/power-on difference",
+        "HiberbootEnabled"
+      ]
     }
   ],
   "safety": {
@@ -39,18 +76,28 @@
       "formatting",
       "bootloader or EFI edits",
       "automatic BIOS changes",
-      "automatic display-driver uninstall"
+      "automatic display-driver uninstall",
+      "automatic Windows Hello enrollment removal"
+    ],
+    "preserve_processes": [
+      "codex",
+      "node",
+      "python",
+      "pwsh",
+      "powershell"
     ]
   },
   "cost": "free-built-in-Windows-tools-only",
-  "next_gate": "install watcher on LenovoPointer, reproduce once, then choose only the evidence-supported reversible fix",
+  "next_gate": "install pre-login SYSTEM watcher + logon watcher; reproduce once; choose only evidence-supported reversible A/B isolation (fingerprint, Echo, or Fast Startup)",
   "implementation": {
     "collector": "windows/Collect-LenovoPointerBlackScreen.ps1",
     "logon_watcher": "windows/Watch-LenovoPointerBlackScreen.ps1",
     "watcher_installer": "windows/Install-LenovoPointerBlackScreenWatch.ps1",
     "reversible_repair": "windows/Repair-LenovoPointerBlackScreen.ps1",
     "one_command_bootstrap": "windows/Bootstrap-LenovoPointerBlackScreen.ps1",
-    "documentation": "docs/lenovopointer-black-screen.md"
+    "documentation": "docs/lenovopointer-black-screen.md",
+    "prelogin_watcher": "windows/Watch-LenovoPointerBlackScreenBoot.ps1",
+    "reversible_fingerprint_gate": "windows/Repair-LenovoPointerBlackScreen.ps1 -Action ApplyFingerprintIsolation -ConfirmAlternativeSignIn"
   },
   "validation": {
     "workflow": "AEGIS Autocheck",
