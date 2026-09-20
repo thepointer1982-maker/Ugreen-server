@@ -38,6 +38,9 @@ def main() -> None:
         os.environ["AEGIS_AUTONOMY_STATUS_FILE"] = str(
             root / "state" / "aegis-autonomy" / "status.json"
         )
+        os.environ["AEGIS_PULL_CONTROL_STATE_FILE"] = str(
+            root / "state" / "aegis-pull-control" / "state.json"
+        )
 
         for p in [
             root / "state" / "aegis-real-cycle",
@@ -50,6 +53,7 @@ def main() -> None:
             root / "state" / "aegis-runner",
             root / "state" / "aegis-docker-efficiency",
             root / "state" / "aegis-autonomy",
+            root / "state" / "aegis-pull-control",
         ]:
             p.mkdir(parents=True, exist_ok=True)
 
@@ -146,7 +150,7 @@ def main() -> None:
                     "schema": "aegis-runner/v2",
                     "configured": True,
                     "service_mode": "user-systemd",
-                    "service_active": True,
+                    "service_active": False,
                     "runner_name": "aegis-ugreen-v2",
                     "labels": ["aegis-ugreen-v2"],
                 }
@@ -204,6 +208,27 @@ def main() -> None:
             encoding="utf-8",
         )
 
+        pull_state = attach_provenance(
+            {
+                "status": "success",
+                "transport": "outbound-pull",
+                "runner_required": False,
+                "action": "status",
+                "sequence": 19,
+                "seen_sequence": 19,
+                "last_sequence": 19,
+                "trusted_sha": "0" * 40,
+                "control_head": "1" * 40,
+                "returncode": 0,
+                "completed_at": "2026-09-20T16:44:00+00:00",
+            },
+            kind="pull-control-state",
+        )
+        (root / "state" / "aegis-pull-control" / "state.json").write_text(
+            json.dumps(pull_state),
+            encoding="utf-8",
+        )
+
         mod.systemd_status = lambda unit: {
             "available": True,
             "scope": "user",
@@ -232,7 +257,15 @@ def main() -> None:
         assert status["control"]["mcp"]["network_listener"] is False
         assert status["control"]["mcp"]["public_port"] is False
         assert status["control"]["runner"]["configured"] is True
-        assert status["control"]["runner"]["service_active"] is True
+        assert status["control"]["runner"]["service_active"] is False
+        assert status["control"]["runner"]["optional_fallback"] is True
+        assert status["control"]["primary"]["transport"] == "outbound-pull"
+        assert status["control"]["primary"]["ready"] is True
+        assert status["control"]["primary"]["runner_required"] is False
+        assert status["control"]["pull_control"]["provenance_verified"] is True
+        assert status["control"]["pull_control"]["last_sequence"] == 19
+        assert status["scheduler"]["pull_control_timer"]["ActiveState"] == "active"
+        assert "runner-service-inactive" not in status["blockers"]
         assert status["control"]["runner"]["runner_name"] == "aegis-ugreen-v2"
         assert status["control"]["docker"]["health"] == "healthy"
         assert status["control"]["docker"]["metrics"]["container_count"] == 6
