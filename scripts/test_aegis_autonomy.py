@@ -32,6 +32,11 @@ def main() -> None:
     assert policy["automatic_capabilities"]["rollback_last_known_good_on_regression"] is True
     assert policy["automatic_capabilities"]["docker_restart_only_if_explicit_autorepair_label"] is True
     assert policy["automatic_capabilities"]["audit_service_lifecycle"] is True
+    assert policy["automatic_capabilities"]["route_local_models_by_task"] is True
+    assert policy["automatic_capabilities"]["wake_configured_lan_worker"] is True
+    assert policy["automatic_capabilities"]["accept_local_voice_tasks"] is True
+    assert policy["automatic_capabilities"]["auto_download_optional_models"] is False
+    assert "aegis-voice-bridge.service" in policy["allowlisted_user_units"]
     assert "aegis-lifecycle.timer" in policy["allowlisted_user_units"]
     assert policy["docker_autorepair"]["required_label"] == "aegis.autorepair=true"
     for required in (
