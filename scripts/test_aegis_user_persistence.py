@@ -14,7 +14,6 @@ def main() -> None:
     assert '"stored_password": False' in text
     assert '"stored_token": False' in text
     assert "sudo loginctl" not in text.replace("sudo -n loginctl", "")
-    assert "password" not in text.lower()
     print("AEGIS USER PERSISTENCE TESTS PASS")
 
 
