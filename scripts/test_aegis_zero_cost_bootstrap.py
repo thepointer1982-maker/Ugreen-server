@@ -28,6 +28,8 @@ def main():
     assert "aegis_autonomy_install.sh" in text
     assert "aegis_service_lifecycle_install.sh" in text
     assert "aegis_offline_escrow_install.sh" in text
+    assert "aegis_runtime_backup_install.sh" in text
+    assert "runtime_backup=$RUNTIME_BACKUP_STATUS" in text
     assert "offline_escrow=$ESCROW_STATUS" in text
     assert "aegis_opencode_install.sh" in text
     assert "aegis_worker_control.py status" in text
