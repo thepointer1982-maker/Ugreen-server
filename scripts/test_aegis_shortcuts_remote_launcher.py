@@ -13,6 +13,10 @@ def main():
     assert "thepointer1982-maker/Ugreen-server/{sha}/scripts/aegis_zero_cost_bootstrap.sh" in s
     assert 'AEGIS_TRUSTED_SHA="$SHA" bash "$TMP_SCRIPT"' in s
     assert "aegis-pull-control/state.json" in s
+    assert "aegis-coder-boot/status.json" in s
+    assert "aegis-coder-boot.timer" in s
+    assert "aegis-real-status/latest.json" in s
+    assert "aegis_real_status.py" in s
     assert "password" not in s.lower()
     assert "AEGIS_RUNNER_TOKEN" not in s
     assert "TS_AUTHKEY" not in s
