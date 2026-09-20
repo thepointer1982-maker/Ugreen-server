@@ -38,6 +38,9 @@ def main() -> None:
         assert initial["pending_action"]
         assert initial["decisions"]
         assert initial["hard_constraints"]
+        assert initial["autonomy"]["status"] == "active"
+        assert initial["autonomy"]["profile"] == "AUTO-MAX-LOCAL"
+        assert initial["autonomy"]["recurring_cloud_ai_cost_allowed"] is False
 
         chat = mod.context_packet("chat")
         alexa = mod.context_packet("alexa")
@@ -46,6 +49,8 @@ def main() -> None:
         assert chat["pending_action"] == alexa["pending_action"]
         assert chat["style_fingerprint"] == alexa["style_fingerprint"]
         assert chat["hard_constraints"] == alexa["hard_constraints"]
+        assert chat["autonomy"]["profile"] == "AUTO-MAX-LOCAL"
+        assert alexa["autonomy"]["profile"] == "AUTO-MAX-LOCAL"
         assert chat["render_policy"]["voice_concise"] is False
         assert alexa["render_policy"]["voice_concise"] is True
         assert alexa["render_policy"]["no_style_reset"] is True
