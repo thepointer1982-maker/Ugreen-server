@@ -101,10 +101,13 @@
   },
   "validation": {
     "workflow": "AEGIS Autocheck",
-    "run_number": 178,
+    "run_number": 190,
     "conclusion": "success",
-    "tested_head": "0ddd94b150e589d1f5c61a7f7c6b44a00ecec1ae",
+    "tested_code_head": "effaa532e1b533e551727b6e6c8d18b4f9aae84a",
     "powershell_parser": "success",
-    "safety_regression": "success"
+    "safety_regression": "success",
+    "windows_hello_prelogin_path": "success",
+    "codex_preservation_contract": "success",
+    "usb_c_observation_path": "success"
   }
 }
