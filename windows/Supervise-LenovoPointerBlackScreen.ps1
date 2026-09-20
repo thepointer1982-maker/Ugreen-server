@@ -1,5 +1,6 @@
 param(
   [int]$Cycles = 6,
+  [int]$InitialDelaySeconds = 45,
   [int]$IntervalSeconds = 60,
   [int]$FreshMinutes = 20,
   [int]$MinRepeatedSnapshots = 2,
@@ -13,6 +14,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $Cycles = [Math]::Max(1, [Math]::Min([Math]::Abs($Cycles), 20))
+$InitialDelaySeconds = [Math]::Max(0, [Math]::Min([Math]::Abs($InitialDelaySeconds), 300))
 $IntervalSeconds = [Math]::Max(15, [Math]::Min([Math]::Abs($IntervalSeconds), 600))
 
 New-Item -ItemType Directory -Path $Root -Force | Out-Null
@@ -96,6 +98,10 @@ if (Test-Path -LiteralPath $LockPath) {
   ConvertTo-Json | Set-Content -LiteralPath $LockPath -Encoding UTF8
 
 try {
+  if ($InitialDelaySeconds -gt 0) {
+    Start-Sleep -Seconds $InitialDelaySeconds
+  }
+
   $state = Read-State
   if ($state -and $state.cooldown_until) {
     $until = [datetime]$state.cooldown_until
