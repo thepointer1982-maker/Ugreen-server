@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -144,7 +145,7 @@ def aegis_evidence_read(source: str, path: str) -> dict[str, Any]:
         "source": source,
         "path": str(candidate.relative_to(root)),
         "bytes": candidate.stat().st_size,
-        "modified_at": candidate.stat().st_mtime_ns,
+        "modified_at": datetime.fromtimestamp(candidate.stat().st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"),
         "sha256": _file_sha256(candidate),
         "raw_content_returned": False,
     }
