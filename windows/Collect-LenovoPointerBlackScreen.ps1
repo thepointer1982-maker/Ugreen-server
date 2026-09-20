@@ -8,7 +8,9 @@ $ProgressPreference = "SilentlyContinue"
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $outDir = Join-Path $OutputRoot $stamp
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-$since = (Get-Date).AddMinutes(-1 * [Math]::Abs($MinutesBack))
+$captureTime = Get-Date
+$since = $captureTime.AddMinutes(-1 * [Math]::Abs($MinutesBack))
+$correlationWindowSeconds = 120
 
 function Write-JsonFile {
   param([string]$Path, $Value)
@@ -162,10 +164,30 @@ $credentialProviderFilters = Safe-Run {
   $root = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\Credential Provider Filters"
   if (Test-Path $root) {
     Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
+      $guid = $_.PSChildName
       $item = Get-Item -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+      $name = $(if ($item) { $item.GetValue("") } else { $null })
+      $clsidPath = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\$guid\InprocServer32"
+      $dll = $null
+      if (Test-Path $clsidPath) {
+        $dllItem = Get-Item -LiteralPath $clsidPath -ErrorAction SilentlyContinue
+        if ($dllItem) { $dll = $dllItem.GetValue("") }
+      }
+      $signatureStatus = $null
+      $signer = $null
+      if ($dll -and (Test-Path -LiteralPath $dll)) {
+        $sig = Get-AuthenticodeSignature -FilePath $dll -ErrorAction SilentlyContinue
+        if ($sig) {
+          $signatureStatus = [string]$sig.Status
+          if ($sig.SignerCertificate) { $signer = $sig.SignerCertificate.Subject }
+        }
+      }
       [pscustomobject]@{
-        Guid = $_.PSChildName
-        Name = $(if ($item) { $item.GetValue("") } else { $null })
+        Guid = $guid
+        Name = $name
+        Dll = $dll
+        SignatureStatus = $signatureStatus
+        Signer = $signer
       }
     }
   }
@@ -217,6 +239,55 @@ foreach ($logName in @("System","Application")) {
 }
 Write-JsonFile (Join-Path $outDir "events.json") $events
 
+$timeline = @()
+foreach ($e in @($helloEvents)) {
+  if ($e.TimeCreated) {
+    $category = $(if ($e.LogName -eq "Microsoft-Windows-Biometrics/Operational") { "biometric" } else { "winlogon" })
+    $timeline += [pscustomobject]@{
+      time = ([datetime]$e.TimeCreated).ToString("o")
+      seconds_before_capture = [Math]::Round(($captureTime - [datetime]$e.TimeCreated).TotalSeconds, 3)
+      category = $category
+      provider = [string]$e.ProviderName
+      event_id = [int]$e.Id
+      level = [string]$e.LevelDisplayName
+    }
+  }
+}
+foreach ($e in @($events)) {
+  if ($e.TimeCreated) {
+    $category = "other"
+    if ($e.Id -eq 4101 -or $e.ProviderName -match "(?i)Display|nvlddmkm|amdwddmg|igfx") { $category = "display-gpu" }
+    elseif ($e.ProviderName -match "(?i)Desktop Window Manager|Application Error|Windows Error Reporting" -and $e.Message -match "(?i)dwm\.exe|explorer\.exe|Desktop Window Manager") { $category = "shell-dwm" }
+    elseif ($e.ProviderName -match "(?i)BTHUSB|Bluetooth|WLAN|Netwtw|NDIS") { $category = "bluetooth-wifi" }
+    elseif ($e.ProviderName -match "(?i)USBHUB3|USBXHCI|Kernel-PnP") { $category = "usb-pnp" }
+    $timeline += [pscustomobject]@{
+      time = ([datetime]$e.TimeCreated).ToString("o")
+      seconds_before_capture = [Math]::Round(($captureTime - [datetime]$e.TimeCreated).TotalSeconds, 3)
+      category = $category
+      provider = [string]$e.ProviderName
+      event_id = [int]$e.Id
+      level = [string]$e.LevelDisplayName
+    }
+  }
+}
+$timeline = @($timeline | Sort-Object { [datetime]$_.time })
+Write-JsonFile (Join-Path $outDir "correlation-timeline.json") $timeline
+
+$recentTimeline = @($timeline | Where-Object {
+  $_.seconds_before_capture -ge 0 -and $_.seconds_before_capture -le $correlationWindowSeconds
+})
+$recentBiometricErrors = @($recentTimeline | Where-Object {
+  $_.category -eq "biometric" -and $_.level -match "(?i)Error|Critical|Warning"
+}).Count
+$recentDisplaySignals = @($recentTimeline | Where-Object { $_.category -eq "display-gpu" }).Count
+$recentShellSignals = @($recentTimeline | Where-Object { $_.category -eq "shell-dwm" }).Count
+$recentBtWifiErrors = @($recentTimeline | Where-Object {
+  $_.category -eq "bluetooth-wifi" -and $_.level -match "(?i)Error|Critical|Warning"
+}).Count
+$recentUsbErrors = @($recentTimeline | Where-Object {
+  $_.category -eq "usb-pnp" -and $_.level -match "(?i)Error|Critical|Warning"
+}).Count
+
 $reliability = Safe-Run {
   Get-CimInstance Win32_ReliabilityRecords -ErrorAction SilentlyContinue |
     Where-Object { $_.TimeGenerated -ge $since } |
@@ -256,6 +327,11 @@ $invalidCredentialProviderSignatures = @(
     $_.Dll -and $_.SignatureStatus -and $_.SignatureStatus -ne "Valid"
   }
 ).Count
+$invalidCredentialProviderFilterSignatures = @(
+  $credentialProviderFilters | Where-Object {
+    $_.Dll -and $_.SignatureStatus -and $_.SignatureStatus -ne "Valid"
+  }
+).Count
 $shellConfigured = [string]$winlogonConfig.Shell
 $userinitConfigured = [string]$winlogonConfig.Userinit
 $shellConfigMismatch = 0
@@ -263,14 +339,15 @@ if ($shellConfigured -and $shellConfigured -notmatch "(?i)^explorer\.exe$") { $s
 if ($userinitConfigured -and $userinitConfigured -notmatch "(?i)userinit\.exe") { $shellConfigMismatch++ }
 
 $scores = [ordered]@{
-  windows_hello_biometrics = [Math]::Min(100, ($biometricErrors * 25) + ($(if ($biometricEndpoints -gt 0 -and $biometric1108 -gt 0) { 10 } else { 0 })) + ($credentialProviderFilterCount * 20) + ($invalidCredentialProviderSignatures * 25))
-  gpu_display_driver = [Math]::Min(100, ($display4101 * 35) + ($liveKernelCount * 25))
-  shell_dwm_explorer = [Math]::Min(100, ($dwmCrashes * 30) + ($explorerCrashes * 30) + ($shellConfigMismatch * 35))
-  bluetooth_wifi_combo = [Math]::Min(100, ($btWifiErrors * 15) + ($(if ($echoEndpoints -gt 0) { 20 } else { 0 })))
-  usb_c_apple_path = [Math]::Min(100, ($usbErrors * 10) + ($(if ($usbAppleDevices -gt 0) { 5 } else { 0 })))
+  windows_hello_biometrics = [Math]::Min(100, ($recentBiometricErrors * 35) + ($invalidCredentialProviderSignatures * 30) + ($invalidCredentialProviderFilterSignatures * 30))
+  gpu_display_driver = [Math]::Min(100, ($recentDisplaySignals * 45) + ($liveKernelCount * 25))
+  shell_dwm_explorer = [Math]::Min(100, ($recentShellSignals * 40) + ($shellConfigMismatch * 35))
+  bluetooth_wifi_combo = [Math]::Min(100, ($recentBtWifiErrors * 25) + ($(if ($echoEndpoints -gt 0 -and $recentBtWifiErrors -gt 0) { 10 } else { 0 })))
+  usb_c_apple_path = [Math]::Min(100, ($recentUsbErrors * 20) + ($(if ($usbAppleDevices -gt 0 -and $recentUsbErrors -gt 0) { 10 } else { 0 })))
   fast_startup_candidate = $(if ($fastStartup.HiberbootEnabled -eq 1) { 20 } else { 0 })
 }
-$ranked = $scores.GetEnumerator() | Sort-Object Value -Descending
+$ranked = @($scores.GetEnumerator() | Sort-Object Value -Descending)
+$topScore = $(if ($ranked.Count -gt 0) { [int]$ranked[0].Value } else { 0 })
 $summary = [ordered]@{
   schema = "aegis-lenovopointer-black-screen/v1"
   collected_at = (Get-Date).ToString("o")
@@ -295,12 +372,20 @@ $summary = [ordered]@{
     credential_provider_count = $credentialProviderCount
     credential_provider_filter_count = $credentialProviderFilterCount
     invalid_credential_provider_signature_count = $invalidCredentialProviderSignatures
+    invalid_credential_provider_filter_signature_count = $invalidCredentialProviderFilterSignatures
+    biometric_recent_warning_error_120s = $recentBiometricErrors
+    display_gpu_recent_signal_120s = $recentDisplaySignals
+    shell_dwm_recent_signal_120s = $recentShellSignals
+    bluetooth_wifi_recent_warning_error_120s = $recentBtWifiErrors
+    usb_pnp_recent_warning_error_120s = $recentUsbErrors
+    correlation_window_seconds = $correlationWindowSeconds
     winlogon_shell_mismatch_count = $shellConfigMismatch
     hiberboot_enabled = $fastStartup.HiberbootEnabled
   }
   hypothesis_scores = $scores
-  leading_hypothesis = $(if ($ranked) { $ranked[0].Name } else { "insufficient-evidence" })
-  interpretation = "Codex and USB-C are observed only; neither is stopped or treated as causal without correlated evidence"
+  leading_hypothesis = $(if ($topScore -gt 0) { $ranked[0].Name } else { "insufficient-evidence" })
+  score_method = "Only temporally correlated warning/error signals, invalid signatures, shell mismatch, live-kernel evidence, and Fast Startup state contribute. Event 1108 and the mere presence of credential-provider filters are informational only."
+  interpretation = "Codex, Echo, fingerprint Event 1108, credential-provider filters, and USB-C presence are correlation evidence only; none is treated as causal without time-correlated errors or integrity failures."
   safety = "collect-only; no drivers, boot, partitions, firmware, biometric enrollment, Codex process, or device state changed"
 }
 Write-JsonFile (Join-Path $outDir "summary.json") $summary
