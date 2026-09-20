@@ -176,6 +176,55 @@ def probation_passes(status: dict[str, Any]) -> bool:
     return True
 
 
+def reusable_preflight(repo: Path, max_age_seconds: int = 120) -> subprocess.CompletedProcess[str] | None:
+    if os.environ.get("AEGIS_GUARDIAN_REUSE_PREFLIGHT") != "1":
+        return None
+    state_root = Path(
+        os.environ.get(
+            "AEGIS_STATE_DIR",
+            Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+            / "aegis-bootstrap",
+        )
+    )
+    report = state_root / "preflight.json"
+    data = read_json(report)
+    try:
+        generated = datetime.fromisoformat(
+            str(data.get("generated_at") or "").replace("Z", "+00:00")
+        )
+        age = (datetime.now(timezone.utc) - generated).total_seconds()
+    except Exception:
+        return None
+
+    if not (0 <= age <= max_age_seconds):
+        return None
+    if data.get("status") != "ready":
+        return None
+    if data.get("blockers"):
+        return None
+    if str(data.get("repo_root") or "") != str(repo.resolve()):
+        return None
+    source = data.get("source")
+    if not isinstance(source, dict) or source.get("status") != "ready":
+        return None
+    git = data.get("git")
+    if not isinstance(git, dict) or git.get("is_repo") is not True:
+        return None
+
+    marker = {
+        "status": "ready",
+        "reused": True,
+        "age_seconds": round(age, 3),
+        "report": str(report),
+    }
+    return subprocess.CompletedProcess(
+        ["reused-preflight"],
+        0,
+        json.dumps(marker, ensure_ascii=False),
+        "",
+    )
+
+
 def classify(failures: int, preflight_rc: int, cycle_rc: int | None) -> tuple[str, str]:
     if failures >= 5:
         return "emergency", "repeated-failures"
@@ -195,7 +244,12 @@ def execute(repo: Path, repair: bool = False, *, run_cycle: bool = True) -> dict
     before = read_env(scheduler_dir / "state.env")
     before_failures = parse_nonnegative_int(before.get("failures"), 0)
 
-    preflight = run(["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)], cwd=repo)
+    preflight = reusable_preflight(repo)
+    if preflight is None:
+        preflight = run(
+            ["bash", "scripts/aegis_nas_bootstrap.sh", "--repo-root", str(repo)],
+            cwd=repo,
+        )
     repairs: list[dict[str, Any]] = []
     if repair:
         repairs = safe_repairs(
@@ -250,6 +304,7 @@ def execute(repo: Path, repair: bool = False, *, run_cycle: bool = True) -> dict
         "preflight": {
             "rc": preflight.returncode,
             "tail": (preflight.stdout + "\n" + preflight.stderr)[-4000:],
+            "reused": bool(preflight.args == ["reused-preflight"]),
         },
         "cycle": {"rc": cycle_rc, "tail": cycle_tail},
         "evidence": {
