@@ -50,6 +50,12 @@ PULL_CONTROL_FILE = Path(
         Path.home() / ".local/state/aegis-pull-control/state.json",
     )
 )
+LIFECYCLE_FILE = Path(
+    os.environ.get(
+        "AEGIS_LIFECYCLE_STATE_FILE",
+        Path.home() / ".local/state/aegis-lifecycle/status.json",
+    )
+)
 
 mcp = MCPServer(
     "AEGIS Local Guardian",
@@ -207,6 +213,16 @@ def primary_control_resource() -> str:
     )
 
 
+@mcp.resource("aegis://lifecycle")
+def lifecycle_resource() -> str:
+    """Verified local service lifecycle and integration audit."""
+    return json.dumps(
+        _verified_state(LIFECYCLE_FILE, "not-yet-measured"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -301,6 +317,12 @@ def project_context() -> dict:
 def primary_control_status() -> dict:
     """Return verified NAS outbound-pull sequence/transport state."""
     return _verified_state(PULL_CONTROL_FILE, "not-yet-measured")
+
+
+@mcp.tool()
+def service_lifecycle_status() -> dict:
+    """Return verified service age/version/integration audit state."""
+    return _verified_state(LIFECYCLE_FILE, "not-yet-measured")
 
 
 @mcp.tool()
