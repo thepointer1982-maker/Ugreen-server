@@ -5,6 +5,11 @@ REPO_URL="${AEGIS_REPO_URL:-https://github.com/thepointer1982-maker/Ugreen-serve
 BRANCH="${AEGIS_BRANCH:-aegis/resume-pre-lenovo-20260920}"
 TRUSTED_SHA="${AEGIS_TRUSTED_SHA:-}"
 DEST="${AEGIS_DEST:-$HOME/aegis/Ugreen-server}"
+FROM_PULL_CONTROL="${AEGIS_BOOTSTRAP_FROM_PULL_CONTROL:-0}"
+[[ "$FROM_PULL_CONTROL" == "0" || "$FROM_PULL_CONTROL" == "1" ]] || {
+  echo "AEGIS_BOOTSTRAP_FROM_PULL_CONTROL must be 0 or 1" >&2
+  exit 64
+}
 
 if [[ -z "$TRUSTED_SHA" || ! "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "AEGIS_TRUSTED_SHA must be a full 40-character lowercase commit SHA." >&2
@@ -59,7 +64,7 @@ fi
 echo "user_persistence=$PERSISTENCE_STATUS"
 
 echo "=== AEGIS PRIMARY ZERO-COST CONTROL ==="
-bash scripts/aegis_pull_control_install.sh
+AEGIS_PULL_CONTROL_NO_START="$FROM_PULL_CONTROL" bash scripts/aegis_pull_control_install.sh
 
 echo "=== AEGIS LOCAL MCP RUNTIME ==="
 MCP_STATUS="skipped"
@@ -152,22 +157,29 @@ fi
 echo "runner_return_channel=$RUNNER_STATUS"
 
 echo "=== AEGIS PULL CONTROL FIRST RUN ==="
-set +e
-python3 scripts/aegis_pull_control.py --repo-root "$DEST"
-rc=$?
-set -e
-
 STATE="$HOME/.local/state/aegis-pull-control/state.json"
-if [[ -s "$STATE" ]]; then
-  echo "=== AEGIS PULL CONTROL STATE ==="
-  cat "$STATE"
+if [[ "$FROM_PULL_CONTROL" == "1" ]]; then
+  rc=0
+  echo "pull_control_first_run=deferred_current_service"
 else
-  echo "state file missing: $STATE" >&2
-  exit 5
-fi
+  set +e
+  python3 scripts/aegis_pull_control.py --repo-root "$DEST"
+  rc=$?
+  set -e
 
-if [[ "$rc" -ne 0 ]]; then
-  echo "pull-control first run returned rc=$rc" >&2
+  if [[ -s "$STATE" ]]; then
+    echo "=== AEGIS PULL CONTROL STATE ==="
+    cat "$STATE"
+  else
+    echo "state file missing: $STATE" >&2
+    exit 5
+  fi
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "pull-control first run returned rc=$rc" >&2
+    exit "$rc"
+  fi
+first run returned rc=$rc" >&2
   exit "$rc"
 fi
 
