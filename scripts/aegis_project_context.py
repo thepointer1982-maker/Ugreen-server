@@ -27,6 +27,12 @@ PROJECT_FILE = Path(
         REPO_ROOT / "config" / "project" / "aegis-core.json",
     )
 )
+AUTONOMY_POLICY_FILE = Path(
+    os.environ.get(
+        "AEGIS_AUTONOMY_POLICY",
+        REPO_ROOT / "config" / "autonomy" / "aegis-max-local.json",
+    )
+)
 STATE_DIR = Path(
     os.environ.get(
         "AEGIS_PROJECT_STATE_DIR",
@@ -121,6 +127,34 @@ def load_project() -> dict[str, Any]:
     return _load_json(PROJECT_FILE)
 
 
+def load_autonomy_policy() -> dict[str, Any]:
+    try:
+        value = _load_json(AUTONOMY_POLICY_FILE)
+    except Exception:
+        return {}
+    if value.get("schema") != "aegis-autonomy-policy/v1":
+        return {}
+    return value
+
+
+def autonomy_packet() -> dict[str, Any]:
+    policy = load_autonomy_policy()
+    if not policy:
+        return {"status": "missing"}
+    return {
+        "status": "active",
+        "profile": policy.get("profile"),
+        "revision": policy.get("revision"),
+        "local_first": policy.get("local_first"),
+        "recurring_cloud_ai_cost_allowed": policy.get(
+            "recurring_cloud_ai_cost_allowed"
+        ),
+        "automatic_capabilities": policy.get("automatic_capabilities", {}),
+        "hard_blocks": policy.get("hard_blocks", []),
+        "docker_autorepair": policy.get("docker_autorepair", {}),
+    }
+
+
 def initial_state() -> dict[str, Any]:
     project = load_project()
     project_id = str(project.get("project_id") or "aegis-core")
@@ -151,6 +185,7 @@ def initial_state() -> dict[str, Any]:
         "style_contract": project.get("style_contract", {}),
         "hard_constraints": project.get("hard_constraints", []),
         "program_gate": project.get("current_program_gate"),
+        "autonomy": autonomy_packet(),
         "repo_head": _git_head(),
     }
     return attach_provenance(state, kind="project-context")
@@ -225,6 +260,7 @@ def record_handoff(
         "style_contract": project.get("style_contract", {}),
         "hard_constraints": project.get("hard_constraints", []),
         "program_gate": project.get("current_program_gate"),
+        "autonomy": autonomy_packet(),
         "repo_head": _git_head(),
     }
     signed = attach_provenance(
@@ -314,6 +350,7 @@ def context_packet(channel: str) -> dict[str, Any]:
         "blockers": state.get("blockers", []),
         "program_gate": state.get("program_gate"),
         "hard_constraints": state.get("hard_constraints", []),
+        "autonomy": autonomy_packet(),
         "style_fingerprint": state["style_fingerprint"],
         "style_contract": state.get("style_contract", {}),
         "render_policy": {
