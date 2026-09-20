@@ -81,6 +81,20 @@ ssh $SSH_OPTS "$NAS_USER@$HOST" '
   else
     echo "state-missing"
   fi
+  printf "coder_boot_timer="
+  systemctl --user is-active aegis-coder-boot.timer 2>/dev/null || true
+  CODER="$HOME/.local/state/aegis-coder-boot/status.json"
+  if [ -s "$CODER" ]; then
+    cat "$CODER"
+  else
+    echo "coder-boot-state-missing"
+  fi
+  REAL="$HOME/.local/state/aegis-real-status/latest.json"
+  if [ -s "$REAL" ]; then
+    cat "$REAL"
+  else
+    echo "real-status-missing"
+  fi
 '
 
 echo "AEGIS iPhone -> UGREEN bootstrap finished."
