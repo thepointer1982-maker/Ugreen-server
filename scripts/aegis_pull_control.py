@@ -11,6 +11,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from aegis_provenance import attach_provenance, verify_provenance
+
 CONTROL_HEAD = "refs/heads/aegis-control"
 CONTROL_REF = "refs/remotes/origin/aegis-control"
 DEV_HEAD = "refs/heads/aegis/resume-pre-lenovo-20260920"
@@ -65,9 +71,30 @@ def read_state(path: Path) -> dict:
         return {"last_sequence": 0}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {"last_sequence": 0}
     except Exception:
         return {"last_sequence": 0}
+    if not isinstance(data, dict):
+        return {"last_sequence": 0}
+    ok, _ = verify_provenance(data)
+    if not ok:
+        return {"last_sequence": 0}
+    return data
+
+
+def write_state(path: Path, data: dict, previous: dict | None = None) -> dict:
+    parent_sha = None
+    if isinstance(previous, dict):
+        ok, _ = verify_provenance(previous)
+        if ok and isinstance(previous.get("_provenance"), dict):
+            parent_sha = previous["_provenance"].get("sha256")
+    signed = attach_provenance(
+        data,
+        kind="pull-control-state",
+        parent_sha256=parent_sha,
+        parent_kind="pull-control-state" if parent_sha else None,
+    )
+    atomic_write_json(path, signed)
+    return signed
 
 
 def normalize_origin(url: str) -> str:
@@ -290,7 +317,9 @@ def main() -> int:
                     "control_head": control_head,
                 }
             )
-            atomic_write_json(state_path, state)
+            state["transport"] = "outbound-pull"
+            state["runner_required"] = False
+            state = write_state(state_path, state, previous=read_state(state_path))
             print(json.dumps(state, ensure_ascii=False))
             return 0
 
@@ -307,7 +336,9 @@ def main() -> int:
                     "control_head": control_head,
                 }
             )
-            atomic_write_json(state_path, state)
+            state["transport"] = "outbound-pull"
+            state["runner_required"] = False
+            state = write_state(state_path, state, previous=read_state(state_path))
             print(json.dumps(state, ensure_ascii=False))
             return 0
 
@@ -318,6 +349,8 @@ def main() -> int:
 
         result = {
             "status": "success" if p.returncode == 0 else "failed",
+            "transport": "outbound-pull",
+            "runner_required": False,
             "action": action,
             "sequence": sequence,
             "seen_sequence": sequence,
@@ -333,18 +366,20 @@ def main() -> int:
         else:
             result["last_sequence"] = last_sequence
 
-        atomic_write_json(state_path, result)
+        result = write_state(state_path, result, previous=state)
         print(json.dumps(result, ensure_ascii=False))
         return p.returncode
     except Exception as exc:
         result = {
             "status": "blocked",
+            "transport": "outbound-pull",
+            "runner_required": False,
             "last_sequence": last_sequence,
             "control_head": control_head or state.get("control_head"),
             "checked_at": now_iso(),
             "error": str(exc),
         }
-        atomic_write_json(state_path, result)
+        result = write_state(state_path, result, previous=state)
         print(json.dumps(result, ensure_ascii=False), file=sys.stderr)
         return 20
 
