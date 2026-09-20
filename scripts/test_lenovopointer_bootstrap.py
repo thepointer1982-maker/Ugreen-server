@@ -13,7 +13,8 @@ def main():
     assert "Repair-LenovoPointerBlackScreen.ps1" in s
     assert "Invoke-WebRequest" in s
     assert "forbidden token" in s
-    assert "-Action Install" in s
+    assert "-Action InstallAll" in s or "-Action InstallBoot" in s
+    assert "Start-Process powershell.exe -Verb RunAs" in s
     assert "-MinutesBack 30" in s
     assert "AEGIS_RUNNER_TOKEN" not in s
     assert "TS_AUTHKEY" not in s
