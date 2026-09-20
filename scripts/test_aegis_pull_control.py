@@ -105,6 +105,8 @@ def main():
     assert "OnUnitActiveSec=60s" in install_text
     assert "AccuracySec=10s" in install_text
     assert "ProtectHome=read-only" in install_text
+    assert "AEGIS_PULL_CONTROL_NO_START" in install_text
+    assert "self_update=deferred_current_service" in install_text
 
     with tempfile.TemporaryDirectory() as raw:
         p = Path(raw) / "state.json"
