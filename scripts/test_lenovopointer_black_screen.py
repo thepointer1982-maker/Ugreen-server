@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INCIDENT = ROOT / "incidents" / "lenovopointer-windows11-black-screen.json"
 COLLECT = ROOT / "windows" / "Collect-LenovoPointerBlackScreen.ps1"
 WATCH = ROOT / "windows" / "Watch-LenovoPointerBlackScreen.ps1"
+BOOTWATCH = ROOT / "windows" / "Watch-LenovoPointerBlackScreenBoot.ps1"
 INSTALL = ROOT / "windows" / "Install-LenovoPointerBlackScreenWatch.ps1"
 REPAIR = ROOT / "windows" / "Repair-LenovoPointerBlackScreen.ps1"
 DOC = ROOT / "docs" / "lenovopointer-black-screen.md"
@@ -44,14 +45,34 @@ def main() -> None:
     assert "4101" in collect
     assert "summary.json" in collect
     assert "Get-NetConnectionProfile" in collect
+    assert "Get-PnpDevice -Class Biometric" in collect
+    assert "Microsoft-Windows-Biometrics/Operational" in collect
+    assert "Microsoft-Windows-Winlogon/Operational" in collect
+    assert "1108" in collect
+    assert "bioiso,ngciso" in collect
+    assert "Win32_DeviceGuard" in collect
+    assert "WbioSrvc" in collect
+    assert "codex" in collect
+    assert "usb-apple-pnp.json" in collect
+    assert "powercfg /a" in collect
 
     watch = WATCH.read_text(encoding="utf-8")
     assert "$delays = @(0, 30, 60, 90)" in watch
     assert "Collect-LenovoPointerBlackScreen.ps1" in watch
 
+    bootwatch = BOOTWATCH.read_text(encoding="utf-8")
+    assert "$offsets = @(0, 10, 20, 30, 45, 60, 90, 120, 180)" in bootwatch
+    assert "$env:ProgramData" in bootwatch
+    assert "-OutputRoot $OutputRoot" in bootwatch
+
     install = INSTALL.read_text(encoding="utf-8")
     assert "New-ScheduledTaskTrigger -AtLogOn" in install
-    assert "-RunLevel Limited" in install
+    assert "New-ScheduledTaskTrigger -AtStartup" in install
+    assert '-UserId "SYSTEM"' in install
+    assert "-LogonType ServiceAccount" in install
+    assert "-RunLevel Highest" in install
+    assert "icacls.exe" in install
+    assert "InstallBoot" in install and "InstallAll" in install
     assert "Unregister-ScheduledTask" in install
 
     repair = REPAIR.read_text(encoding="utf-8")
@@ -59,6 +80,10 @@ def main() -> None:
         "PlanEchoIsolation",
         "ApplyEchoIsolation",
         "RestoreEcho",
+        "PlanFingerprintIsolation",
+        "ApplyFingerprintIsolation",
+        "RestoreFingerprint",
+        "RestartBiometricService",
         "DisableFastStartup",
         "RestoreFastStartup",
         "RestartExplorer",
@@ -66,15 +91,19 @@ def main() -> None:
         assert action in repair
     assert "already-applied" in repair
     assert "already-disabled" in repair
+    assert "ConfirmAlternativeSignIn" in repair
+    assert "fingerprint-isolation.json" in repair
     assert "Disable-PnpDevice" in repair
     assert "Enable-PnpDevice" in repair
     assert "HiberbootEnabled" in repair
 
     combined = "\n".join(
-        p.read_text(encoding="utf-8") for p in [COLLECT, WATCH, INSTALL, REPAIR]
+        p.read_text(encoding="utf-8") for p in [COLLECT, WATCH, BOOTWATCH, INSTALL, REPAIR]
     )
     for token in DANGEROUS:
         assert token.lower() not in combined.lower(), token
+    assert "Stop-Process -Name codex" not in combined
+    assert "taskkill /im codex" not in combined.lower()
 
     doc = DOC.read_text(encoding="utf-8")
     assert "Win+Ctrl+Shift+B" in doc
