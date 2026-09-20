@@ -31,6 +31,8 @@ def main() -> None:
     assert policy["automatic_capabilities"]["run_tests_and_validation"] is True
     assert policy["automatic_capabilities"]["rollback_last_known_good_on_regression"] is True
     assert policy["automatic_capabilities"]["docker_restart_only_if_explicit_autorepair_label"] is True
+    assert policy["automatic_capabilities"]["audit_service_lifecycle"] is True
+    assert "aegis-lifecycle.timer" in policy["allowlisted_user_units"]
     assert policy["docker_autorepair"]["required_label"] == "aegis.autorepair=true"
     for required in (
         "docker_prune",
