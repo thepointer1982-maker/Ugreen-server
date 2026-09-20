@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="${AEGIS_BOOTSTRAP_REPO_URL:-https://github.com/thepointer1982-maker/Ugreen-server.git}"
-BRANCH="${AEGIS_BOOTSTRAP_BRANCH:-aegis/guardian-learning-mcp}"
+BRANCH="${AEGIS_BOOTSTRAP_BRANCH:-aegis/resume-pre-lenovo-20260920}"
 DEST="${AEGIS_BOOTSTRAP_DEST:-$HOME/aegis-bootstrap/Ugreen-server}"
 
 for cmd in git bash python3 curl; do
