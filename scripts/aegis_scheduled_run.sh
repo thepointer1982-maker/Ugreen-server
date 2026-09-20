@@ -14,6 +14,15 @@ LOG_FILE="$STATE_DIR/scheduler.log"
 BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || printf '%s' unknown)"
 mkdir -p "$STATE_DIR"
 
+LOG_MAX_BYTES="${AEGIS_SCHEDULER_LOG_MAX_BYTES:-5242880}"
+if [[ "$LOG_MAX_BYTES" =~ ^[0-9]+$ && -f "$LOG_FILE" ]]; then
+  log_size="$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)"
+  if [[ "$log_size" =~ ^[0-9]+$ ]] && (( log_size > LOG_MAX_BYTES )); then
+    rm -f -- "$LOG_FILE.1"
+    mv -- "$LOG_FILE" "$LOG_FILE.1"
+  fi
+fi
+
 log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$LOG_FILE"
 }
