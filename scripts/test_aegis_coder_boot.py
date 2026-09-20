@@ -22,6 +22,7 @@ def main() -> None:
     install = INSTALL.read_text(encoding="utf-8")
 
     assert "codex-local" in guard
+    assert "aegis_opencode_guard.py" in guard
     assert "AEGIS_ALLOW_CLOUD_CODEX" in guard
     assert "codex_cloud_check_performed" in guard
     assert "timeout 8s codex login status" in guard
