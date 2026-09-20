@@ -28,7 +28,13 @@ class SchedulerTests(unittest.TestCase):
         )
         return repo
 
-    def run_wrapper(self, repo: Path, state: Path, counter: Path):
+    def run_wrapper(
+        self,
+        repo: Path,
+        state: Path,
+        counter: Path,
+        extra_env: dict[str, str] | None = None,
+    ):
         env = os.environ.copy()
         env.update({
             "AEGIS_REPO_ROOT": str(repo),
@@ -36,6 +42,8 @@ class SchedulerTests(unittest.TestCase):
             "AEGIS_TEST_COUNTER": str(counter),
             "AEGIS_SCHEDULER_PUSH": "0",
         })
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(["bash", str(WRAPPER)], text=True, capture_output=True, env=env)
 
     def run_installer(self, *args: str):
@@ -68,6 +76,28 @@ class SchedulerTests(unittest.TestCase):
             text = (state / "state.env").read_text()
             self.assertIn("failures=0", text)
             self.assertIn("next_allowed=0", text)
+
+    def test_scheduler_rotates_large_log(self):
+        with tempfile.TemporaryDirectory() as raw:
+            td = Path(raw)
+            repo = self.make_repo(td, 0)
+            state, counter = td / "state", td / "counter"
+            state.mkdir(parents=True)
+            log = state / "scheduler.log"
+            log.write_text("x" * 128, encoding="utf-8")
+            result = self.run_wrapper(
+                repo,
+                state,
+                counter,
+                {"AEGIS_SCHEDULER_LOG_MAX_BYTES": "32"},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((state / "scheduler.log.1").exists())
+            self.assertEqual(
+                (state / "scheduler.log.1").read_text(encoding="utf-8"),
+                "x" * 128,
+            )
+            self.assertIn("status=start", log.read_text(encoding="utf-8"))
 
     def test_scheduler_records_real_shell_pid(self):
         text = WRAPPER.read_text(encoding="utf-8")
