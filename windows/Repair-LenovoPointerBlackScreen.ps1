@@ -1,12 +1,14 @@
 param(
-  [ValidateSet("Status","PlanEchoIsolation","ApplyEchoIsolation","RestoreEcho","DisableFastStartup","RestoreFastStartup","RestartExplorer")]
-  [string]$Action = "Status"
+  [ValidateSet("Status","PlanEchoIsolation","ApplyEchoIsolation","RestoreEcho","PlanFingerprintIsolation","ApplyFingerprintIsolation","RestoreFingerprint","RestartBiometricService","DisableFastStartup","RestoreFastStartup","RestartExplorer")]
+  [string]$Action = "Status",
+  [switch]$ConfirmAlternativeSignIn
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Join-Path $env:LOCALAPPDATA "AEGIS\LenovoPointer\BlackScreen"
 $StateDir = Join-Path $Root "repair-state"
 $EchoState = Join-Path $StateDir "echo-isolation.json"
+$FingerprintState = Join-Path $StateDir "fingerprint-isolation.json"
 $FastState = Join-Path $StateDir "fast-startup.json"
 New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 
@@ -27,6 +29,19 @@ function Get-EchoDevices {
     Select-Object Status, Class, FriendlyName, InstanceId, Problem)
 }
 
+function Get-FingerprintDevices {
+  if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) { return @() }
+  @(Get-PnpDevice -Class Biometric -ErrorAction SilentlyContinue |
+    Where-Object { $_.FriendlyName -match "(?i)finger|goodix|synaptics|elan|fpc|wbf|biometric" } |
+    Select-Object Status, Class, FriendlyName, InstanceId, Problem)
+}
+
+function Get-FingerprintDrivers {
+  @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue |
+    Where-Object { $_.DeviceClass -eq "BIOMETRIC" -or $_.DeviceName -match "(?i)finger|goodix|synaptics|elan|fpc|wbf|biometric" } |
+    Select-Object DeviceName, Manufacturer, DriverProviderName, DriverVersion, DriverDate, InfName, DeviceID)
+}
+
 function Get-FastStartupValue {
   $path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
   try {
@@ -41,16 +56,20 @@ function Write-State {
   $Value | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
-if ($Action -eq "Status" -or $Action -eq "PlanEchoIsolation") {
+if ($Action -eq "Status" -or $Action -eq "PlanEchoIsolation" -or $Action -eq "PlanFingerprintIsolation") {
   [pscustomobject]@{
     action = $Action
     admin = (Test-Admin)
     echo_candidates = @(Get-EchoDevices)
     echo_backup_exists = (Test-Path -LiteralPath $EchoState)
+    fingerprint_candidates = @(Get-FingerprintDevices)
+    fingerprint_drivers = @(Get-FingerprintDrivers)
+    fingerprint_backup_exists = (Test-Path -LiteralPath $FingerprintState)
+    biometric_service = @(Get-CimInstance Win32_Service -Filter "Name='WbioSrvc'" -ErrorAction SilentlyContinue | Select-Object Name, State, StartMode, Status, ProcessId)
     hiberboot_enabled = (Get-FastStartupValue)
     fast_startup_backup_exists = (Test-Path -LiteralPath $FastState)
-    safety = "No changes performed by Status/PlanEchoIsolation"
-  } | ConvertTo-Json -Depth 8
+    safety = "No changes performed by Status/Plan actions"
+  } | ConvertTo-Json -Depth 10
   exit 0
 }
 
@@ -96,6 +115,62 @@ if ($Action -eq "RestoreEcho") {
   $state | Add-Member -NotePropertyName restored_at -NotePropertyValue (Get-Date).ToString("o") -Force
   Write-State $EchoState $state
   [pscustomobject]@{ status="restored"; backup=$EchoState } | ConvertTo-Json
+  exit 0
+}
+
+if ($Action -eq "ApplyFingerprintIsolation") {
+  Require-Admin
+  if (-not $ConfirmAlternativeSignIn) {
+    throw "Blocked: confirm that PIN or password sign-in works, then rerun with -ConfirmAlternativeSignIn."
+  }
+  if (-not (Get-Command Disable-PnpDevice -ErrorAction SilentlyContinue)) { throw "Disable-PnpDevice is unavailable." }
+  if (Test-Path -LiteralPath $FingerprintState) {
+    $existing = Get-Content -LiteralPath $FingerprintState -Raw | ConvertFrom-Json
+    if ($existing.active -eq $true) {
+      [pscustomobject]@{ status="already-applied"; backup=$FingerprintState; device_count=@($existing.devices).Count } | ConvertTo-Json
+      exit 0
+    }
+  }
+  $devices = @(Get-FingerprintDevices)
+  if ($devices.Count -eq 0) { throw "No fingerprint-like biometric endpoint was found. Nothing changed." }
+  $state = [ordered]@{
+    schema = "aegis-fingerprint-isolation/v1"
+    applied_at = (Get-Date).ToString("o")
+    active = $true
+    devices = @($devices)
+  }
+  Write-State $FingerprintState $state
+  foreach ($d in $devices) {
+    if ($d.Status -eq "OK") {
+      Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop
+    }
+  }
+  [pscustomobject]@{ status="applied"; backup=$FingerprintState; device_count=$devices.Count; note="Use PIN/password for the next sign-in test." } | ConvertTo-Json
+  exit 0
+}
+
+if ($Action -eq "RestoreFingerprint") {
+  Require-Admin
+  if (-not (Get-Command Enable-PnpDevice -ErrorAction SilentlyContinue)) { throw "Enable-PnpDevice is unavailable." }
+  if (-not (Test-Path -LiteralPath $FingerprintState)) { throw "Fingerprint isolation backup not found." }
+  $state = Get-Content -LiteralPath $FingerprintState -Raw | ConvertFrom-Json
+  foreach ($d in @($state.devices)) {
+    if ($d.Status -eq "OK" -and $d.InstanceId) {
+      Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Continue
+    }
+  }
+  $state.active = $false
+  $state | Add-Member -NotePropertyName restored_at -NotePropertyValue (Get-Date).ToString("o") -Force
+  Write-State $FingerprintState $state
+  [pscustomobject]@{ status="restored"; backup=$FingerprintState } | ConvertTo-Json
+  exit 0
+}
+
+if ($Action -eq "RestartBiometricService") {
+  Require-Admin
+  $svc = Get-Service -Name WbioSrvc -ErrorAction Stop
+  Restart-Service -Name WbioSrvc -Force -ErrorAction Stop
+  [pscustomobject]@{ status="biometric-service-restarted"; previous_status=[string]$svc.Status; changed_at=(Get-Date).ToString("o") } | ConvertTo-Json
   exit 0
 }
 
