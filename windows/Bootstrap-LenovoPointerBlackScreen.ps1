@@ -15,6 +15,8 @@ $files = @(
   "Collect-LenovoPointerBlackScreen.ps1",
   "Watch-LenovoPointerBlackScreen.ps1",
   "Recover-LenovoPointerBlackScreen.ps1",
+  "Resolve-LenovoPointerBlackScreen.ps1",
+  "Supervise-LenovoPointerBlackScreen.ps1",
   "Watch-LenovoPointerBlackScreenBoot.ps1",
   "Install-LenovoPointerBlackScreenWatch.ps1",
   "Repair-LenovoPointerBlackScreen.ps1"
