@@ -75,11 +75,11 @@ jobs:
           fi
 
           git -C "$REPO" remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
-          git -C "$REPO" fetch --prune origin aegis/guardian-learning-mcp
+          git -C "$REPO" fetch --prune origin aegis/resume-pre-lenovo-20260920
           git -C "$REPO" cat-file -e "$TRUSTED_SHA^{commit}"
 
           if ! git -C "$REPO" merge-base --is-ancestor "$TRUSTED_SHA" FETCH_HEAD; then
-            echo "blocked: trusted_sha is not an ancestor of origin/aegis/guardian-learning-mcp" >&2
+            echo "blocked: trusted_sha is not an ancestor of origin/aegis/resume-pre-lenovo-20260920" >&2
             exit 20
           fi
 
