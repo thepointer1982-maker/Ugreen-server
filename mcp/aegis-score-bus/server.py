@@ -60,14 +60,31 @@ def _verify_manifest(root: Path, rel_manifest: str) -> dict[str, Any]:
             checks.append({"line": text, "valid": False, "reason": "unparsed"})
             continue
         expected, rel = match.groups()
-        candidate = (manifest.parent / rel.strip()).resolve()
-        try:
-            candidate.relative_to(root)
-        except ValueError:
-            checks.append({"file": rel.strip(), "valid": False, "reason": "path-escape"})
-            continue
-        if not candidate.is_file():
-            checks.append({"file": str(candidate.relative_to(root)), "valid": False, "reason": "missing"})
+        rel_text = rel.strip()
+        candidates = [
+            (manifest.parent / rel_text).resolve(),
+            (root / rel_text).resolve(),
+        ]
+        candidate = None
+        for option in candidates:
+            try:
+                option.relative_to(root)
+            except ValueError:
+                continue
+            if option.is_file():
+                candidate = option
+                break
+        if candidate is None:
+            safe_options = []
+            for option in candidates:
+                try:
+                    safe_options.append(str(option.relative_to(root)))
+                except ValueError:
+                    pass
+            if not safe_options:
+                checks.append({"file": rel_text, "valid": False, "reason": "path-escape"})
+            else:
+                checks.append({"file": rel_text, "valid": False, "reason": "missing"})
             continue
         actual = _file_sha256(candidate)
         checks.append({
