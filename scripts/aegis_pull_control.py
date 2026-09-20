@@ -11,19 +11,37 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+CONTROL_HEAD = "refs/heads/aegis-control"
 CONTROL_REF = "refs/remotes/origin/aegis-control"
+DEV_HEAD = "refs/heads/aegis/resume-pre-lenovo-20260920"
 DEV_REF = "refs/remotes/origin/aegis/resume-pre-lenovo-20260920"
 CONTROL_PATH = ".aegis-control/request.json"
 ALLOWED = {"status", "real-cycle", "deploy-retry"}
 
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-def run(cmd: list[str], cwd: Path, timeout: int = 120, check: bool = True) -> subprocess.CompletedProcess[str]:
-    p = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+
+def run(
+    cmd: list[str],
+    cwd: Path,
+    timeout: int = 120,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    p = subprocess.run(
+        cmd,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+    )
     if check and p.returncode != 0:
-        raise RuntimeError(f"command failed rc={p.returncode}: {cmd!r}\n{p.stderr[-2000:]}")
+        raise RuntimeError(
+            f"command failed rc={p.returncode}: {cmd!r}\n{p.stderr[-2000:]}"
+        )
     return p
+
 
 def atomic_write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -41,6 +59,7 @@ def atomic_write_json(path: Path, data: dict) -> None:
         except FileNotFoundError:
             pass
 
+
 def read_state(path: Path) -> dict:
     if not path.is_file():
         return {"last_sequence": 0}
@@ -50,8 +69,14 @@ def read_state(path: Path) -> dict:
     except Exception:
         return {"last_sequence": 0}
 
+
 def normalize_origin(url: str) -> str:
-    return url.strip().removesuffix(".git").replace("git@github.com:", "https://github.com/")
+    return (
+        url.strip()
+        .removesuffix(".git")
+        .replace("git@github.com:", "https://github.com/")
+    )
+
 
 def validate_origin(repo: Path) -> None:
     url = run(["git", "remote", "get-url", "origin"], repo).stdout.strip()
@@ -59,12 +84,61 @@ def validate_origin(repo: Path) -> None:
     if normalize_origin(url) != expected:
         raise RuntimeError(f"blocked unexpected origin: {url}")
 
-def fetch_refs(repo: Path) -> None:
-    run([
-        "git", "fetch", "--prune", "origin",
-        "+refs/heads/aegis-control:refs/remotes/origin/aegis-control",
-        "+refs/heads/aegis/resume-pre-lenovo-20260920:refs/remotes/origin/aegis/resume-pre-lenovo-20260920",
-    ], repo, timeout=180)
+
+def remote_control_head(repo: Path) -> str:
+    p = run(
+        ["git", "ls-remote", "--heads", "origin", CONTROL_HEAD],
+        repo,
+        timeout=30,
+    )
+    lines = [line.strip() for line in p.stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise RuntimeError("blocked unable to resolve unique control head")
+    sha = lines[0].split()[0]
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise RuntimeError("blocked invalid remote control head")
+    return sha
+
+
+def can_fast_idle(state: dict, control_head: str, last_sequence: int) -> bool:
+    try:
+        seen = int(state.get("seen_sequence") or state.get("sequence") or 0)
+    except (TypeError, ValueError):
+        seen = 0
+    return (
+        state.get("control_head") == control_head
+        and state.get("status") in {"success", "idle"}
+        and last_sequence >= seen
+    )
+
+
+def fetch_control_ref(repo: Path) -> None:
+    run(
+        [
+            "git",
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"+{CONTROL_HEAD}:{CONTROL_REF}",
+        ],
+        repo,
+        timeout=90,
+    )
+
+
+def fetch_dev_ref(repo: Path) -> None:
+    run(
+        [
+            "git",
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"+{DEV_HEAD}:{DEV_REF}",
+        ],
+        repo,
+        timeout=120,
+    )
+
 
 def load_request(repo: Path) -> dict:
     raw = run(["git", "show", f"{CONTROL_REF}:{CONTROL_PATH}"], repo).stdout
@@ -73,7 +147,11 @@ def load_request(repo: Path) -> dict:
         raise RuntimeError("blocked request is not an object")
     return data
 
-def validate_request(req: dict, last_sequence: int) -> tuple[str, int, str]:
+
+def validate_request(
+    req: dict,
+    last_sequence: int,
+) -> tuple[str, int, str]:
     if req.get("schema") != "aegis-control/v2":
         raise RuntimeError("blocked unsupported schema")
     action = req.get("action")
@@ -89,44 +167,108 @@ def validate_request(req: dict, last_sequence: int) -> tuple[str, int, str]:
         raise RuntimeError("blocked invalid trusted_sha")
     return action, sequence, sha
 
+
 def validate_trusted_sha(repo: Path, sha: str) -> None:
     run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
-    p = run(["git", "merge-base", "--is-ancestor", sha, DEV_REF], repo, check=False)
+    p = run(
+        ["git", "merge-base", "--is-ancestor", sha, DEV_REF],
+        repo,
+        check=False,
+    )
     if p.returncode != 0:
-        raise RuntimeError("blocked trusted_sha is not on tested development branch")
+        raise RuntimeError(
+            "blocked trusted_sha is not on tested development branch"
+        )
+
 
 def prepare_runtime(repo: Path, runtime: Path, sha: str) -> None:
     if not (runtime / ".git").exists():
         runtime.parent.mkdir(parents=True, exist_ok=True)
-        run(["git", "clone", "--no-checkout", str(repo), str(runtime)], repo.parent, timeout=180)
+        run(
+            ["git", "clone", "--no-checkout", str(repo), str(runtime)],
+            repo.parent,
+            timeout=180,
+        )
     else:
         run(["git", "remote", "set-url", "origin", str(repo)], runtime)
-    run(["git", "fetch", "--prune", "origin"], runtime, timeout=180)
+
+    has_commit = run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        runtime,
+        check=False,
+    )
+    if has_commit.returncode != 0:
+        targeted = run(
+            ["git", "fetch", "--no-tags", "origin", sha],
+            runtime,
+            timeout=120,
+            check=False,
+        )
+        if targeted.returncode != 0:
+            run(["git", "fetch", "--no-tags", "origin"], runtime, timeout=180)
+
     run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], runtime)
-    run(["git", "checkout", "--detach", "--force", sha], runtime)
+    current = run(
+        ["git", "rev-parse", "HEAD"],
+        runtime,
+        check=False,
+    )
+    if current.returncode != 0 or current.stdout.strip() != sha:
+        run(["git", "checkout", "--detach", "--force", sha], runtime)
     run(["git", "reset", "--hard", sha], runtime)
     run(["git", "clean", "-fdx"], runtime)
     dirty = run(["git", "status", "--porcelain"], runtime).stdout.strip()
     if dirty:
         raise RuntimeError("blocked runtime checkout is dirty")
 
-def execute(action: str, runtime: Path) -> subprocess.CompletedProcess[str]:
+
+def execute(
+    action: str,
+    runtime: Path,
+) -> subprocess.CompletedProcess[str]:
     if action == "status":
-        cmd = ["python3", "scripts/aegis_real_status.py", "--repo-root", str(runtime)]
+        cmd = [
+            "python3",
+            "scripts/aegis_real_status.py",
+            "--repo-root",
+            str(runtime),
+        ]
         timeout = 180
     elif action == "real-cycle":
-        cmd = ["python3", "scripts/aegis_real_cycle.py", "--repo-root", str(runtime)]
+        cmd = [
+            "python3",
+            "scripts/aegis_real_cycle.py",
+            "--repo-root",
+            str(runtime),
+        ]
         timeout = 900
     else:
-        cmd = ["bash", "scripts/aegis_remote_apply_retry.sh", "--repo-root", str(runtime), "--repair"]
+        cmd = [
+            "bash",
+            "scripts/aegis_remote_apply_retry.sh",
+            "--repo-root",
+            str(runtime),
+            "--repair",
+        ]
         timeout = 1800
     return run(cmd, runtime, timeout=timeout, check=False)
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=".")
-    ap.add_argument("--state-file", default=str(Path.home() / ".local/state/aegis-pull-control/state.json"))
-    ap.add_argument("--runtime-root", default=str(Path.home() / ".local/share/aegis-pull-control/runtime"))
+    ap.add_argument(
+        "--state-file",
+        default=str(
+            Path.home() / ".local/state/aegis-pull-control/state.json"
+        ),
+    )
+    ap.add_argument(
+        "--runtime-root",
+        default=str(
+            Path.home() / ".local/share/aegis-pull-control/runtime"
+        ),
+    )
     args = ap.parse_args()
 
     repo = Path(args.repo_root).resolve()
@@ -134,25 +276,53 @@ def main() -> int:
     runtime = Path(args.runtime_root).expanduser().resolve() / "Ugreen-server"
     state = read_state(state_path)
     last_sequence = int(state.get("last_sequence") or 0)
+    control_head = str(state.get("control_head") or "")
 
     try:
         validate_origin(repo)
-        fetch_refs(repo)
-        req = load_request(repo)
-        action, sequence, trusted = validate_request(req, last_sequence)
-        if trusted == "stale":
-            state.update({"status": "idle", "last_checked_at": now_iso(), "seen_sequence": sequence})
+        control_head = remote_control_head(repo)
+
+        if can_fast_idle(state, control_head, last_sequence):
+            state.update(
+                {
+                    "status": "idle",
+                    "last_checked_at": now_iso(),
+                    "control_head": control_head,
+                }
+            )
             atomic_write_json(state_path, state)
             print(json.dumps(state, ensure_ascii=False))
             return 0
+
+        fetch_control_ref(repo)
+        req = load_request(repo)
+        action, sequence, trusted = validate_request(req, last_sequence)
+
+        if trusted == "stale":
+            state.update(
+                {
+                    "status": "idle",
+                    "last_checked_at": now_iso(),
+                    "seen_sequence": sequence,
+                    "control_head": control_head,
+                }
+            )
+            atomic_write_json(state_path, state)
+            print(json.dumps(state, ensure_ascii=False))
+            return 0
+
+        fetch_dev_ref(repo)
         validate_trusted_sha(repo, trusted)
         prepare_runtime(repo, runtime, trusted)
         p = execute(action, runtime)
+
         result = {
             "status": "success" if p.returncode == 0 else "failed",
             "action": action,
             "sequence": sequence,
+            "seen_sequence": sequence,
             "trusted_sha": trusted,
+            "control_head": control_head,
             "returncode": p.returncode,
             "completed_at": now_iso(),
             "stdout_tail": p.stdout[-6000:],
@@ -162,6 +332,7 @@ def main() -> int:
             result["last_sequence"] = sequence
         else:
             result["last_sequence"] = last_sequence
+
         atomic_write_json(state_path, result)
         print(json.dumps(result, ensure_ascii=False))
         return p.returncode
@@ -169,12 +340,14 @@ def main() -> int:
         result = {
             "status": "blocked",
             "last_sequence": last_sequence,
+            "control_head": control_head or state.get("control_head"),
             "checked_at": now_iso(),
             "error": str(exc),
         }
         atomic_write_json(state_path, result)
         print(json.dumps(result, ensure_ascii=False), file=sys.stderr)
         return 20
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
