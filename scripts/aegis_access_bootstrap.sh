@@ -13,16 +13,26 @@ Usage:
   bash scripts/aegis_access_bootstrap.sh tailscale-ssh
   bash scripts/aegis_access_bootstrap.sh all
 
+Runner credentials:
+- AEGIS_RUNNER_TOKEN if explicitly provided
+- otherwise an existing authenticated GitHub CLI (gh) session is used to
+  request a short-lived runner registration token automatically
+
 Environment:
-  AEGIS_RUNNER_TOKEN   one-time GitHub self-hosted runner registration token
-  TS_AUTHKEY           optional Tailscale auth key; otherwise interactive login URL
+  TS_AUTHKEY optional Tailscale auth key; otherwise interactive login URL
 
 Purpose:
 - establish an outbound GitHub control channel to the NAS
 - optionally establish a private Tailnet SSH path
 - never open router ports
-- never store credentials in the repository
+- never persist runner registration tokens in the repository
 EOF
+}
+
+gh_runner_capable() {
+  command -v gh >/dev/null 2>&1 || return 1
+  gh auth status --hostname github.com >/dev/null 2>&1 || return 1
+  return 0
 }
 
 preflight() {
@@ -33,13 +43,19 @@ preflight() {
   echo "kernel=$(uname -srmo 2>/dev/null || true)"
   echo "arch=$(uname -m)"
 
-  for cmd in git python3 curl tar; do
+  for cmd in git python3 curl tar gh; do
     if command -v "$cmd" >/dev/null 2>&1; then
       echo "$cmd=ok path=$(command -v "$cmd")"
     else
       echo "$cmd=missing"
     fi
   done
+
+  if gh_runner_capable; then
+    echo "github_cli_auth=ready"
+  else
+    echo "github_cli_auth=unavailable"
+  fi
 
   if command -v docker >/dev/null 2>&1; then
     echo "docker=ok"
@@ -76,11 +92,6 @@ preflight() {
 }
 
 runner() {
-  [[ -n "${AEGIS_RUNNER_TOKEN:-}" ]] || {
-    echo "AEGIS_RUNNER_TOKEN missing." >&2
-    echo "Create a repository self-hosted runner token in GitHub, export it only in this shell, then rerun." >&2
-    exit 4
-  }
   bash "$ROOT/scripts/aegis_runner_install.sh"
 }
 
@@ -119,10 +130,10 @@ case "$MODE" in
     ;;
   all)
     preflight
-    if [[ -n "${AEGIS_RUNNER_TOKEN:-}" ]]; then
+    if [[ -n "${AEGIS_RUNNER_TOKEN:-}" ]] || gh_runner_capable; then
       runner
     else
-      echo "runner=skipped reason=AEGIS_RUNNER_TOKEN-missing"
+      echo "runner=skipped reason=no-explicit-token-and-no-authorized-gh-session"
     fi
     if command -v docker >/dev/null 2>&1 && [[ -c /dev/net/tun ]]; then
       tailscale_login
