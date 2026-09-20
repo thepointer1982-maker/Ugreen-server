@@ -143,6 +143,23 @@ else
 fi
 echo "autonomy=$AUTONOMY_STATUS"
 
+echo "=== AEGIS SERVICE LIFECYCLE GUARDIAN ==="
+LIFECYCLE_STATUS="skipped"
+if systemctl --user show-environment >/dev/null 2>&1; then
+  set +e
+  bash scripts/aegis_service_lifecycle_install.sh
+  lifecycle_rc=$?
+  set -e
+  if [[ "$lifecycle_rc" -eq 0 ]]; then
+    LIFECYCLE_STATUS="active"
+  else
+    LIFECYCLE_STATUS="failed:$lifecycle_rc"
+  fi
+else
+  LIFECYCLE_STATUS="user-systemd-unavailable"
+fi
+echo "lifecycle=$LIFECYCLE_STATUS"
+
 echo "=== AEGIS OPTIONAL RETURN CHANNEL ==="
 RUNNER_STATUS="skipped"
 set +e
@@ -188,4 +205,5 @@ echo "codex_oss=$CODEX_OSS_STATUS"
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 echo "docker_efficiency=$DOCKER_EFFICIENCY_STATUS"
 echo "autonomy=$AUTONOMY_STATUS"
+echo "lifecycle=$LIFECYCLE_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
