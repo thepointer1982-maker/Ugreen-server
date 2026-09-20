@@ -51,7 +51,7 @@ cat > "$UNIT_DIR/aegis-lifecycle.timer" <<'EOF'
 Description=Run AEGIS service lifecycle audit daily
 
 [Timer]
-OnBootSec=90s
+OnActiveSec=2min
 OnUnitActiveSec=1d
 RandomizedDelaySec=10min
 Persistent=true
@@ -63,7 +63,6 @@ EOF
 
 systemctl --user daemon-reload
 systemctl --user enable --now aegis-lifecycle.timer
-systemctl --user start aegis-lifecycle.service || true
 
 active=0
 if systemctl --user is-active --quiet aegis-lifecycle.timer; then
