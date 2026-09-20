@@ -21,6 +21,8 @@ def main():
     assert "AEGIS_ALLOW_CLOUD_CODEX" in text
     assert "codex-local" in text
     assert "aegis_coder_boot_install.sh" in text
+    assert "aegis_docker_efficiency_install.sh" in text
+    assert "docker_efficiency=$DOCKER_EFFICIENCY_STATUS" in text
     assert "mcp_runtime=$MCP_STATUS" in text
     assert "codex_oss=$CODEX_OSS_STATUS" in text
     assert "coder_boot_guardian=$CODER_BOOT_STATUS" in text
