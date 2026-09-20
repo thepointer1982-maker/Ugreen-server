@@ -1,0 +1,54 @@
+{
+  "schema": "aegis-local-model-registry/v1",
+  "reviewed_at": "2026-09-20",
+  "ollama_endpoint": "http://127.0.0.1:11434",
+  "policy": {
+    "local_only": true,
+    "auto_download_optional_models": false,
+    "primary_coding_model": "qwen2.5-coder:7b",
+    "reasoning_model": "deepseek-r1:8b",
+    "legacy_models_not_auto_selected": true
+  },
+  "models": [
+    {
+      "id": "qwen2.5-coder:7b",
+      "provider": "ollama",
+      "class": "primary",
+      "roles": [
+        "coding",
+        "refactor",
+        "tests",
+        "general"
+      ],
+      "approximate_download_gb": null,
+      "auto_select": true
+    },
+    {
+      "id": "deepseek-r1:8b",
+      "provider": "ollama",
+      "class": "secondary",
+      "roles": [
+        "reasoning",
+        "debug",
+        "architecture",
+        "root-cause"
+      ],
+      "approximate_download_gb": 5.2,
+      "auto_select": true,
+      "download_policy": "explicit-or-preinstalled",
+      "upstream": "ollama.com/library/deepseek-r1"
+    },
+    {
+      "id": "deepseek-coder:6.7b",
+      "provider": "ollama",
+      "class": "legacy-optional",
+      "roles": [
+        "coding"
+      ],
+      "approximate_download_gb": 3.8,
+      "auto_select": false,
+      "download_policy": "preinstalled-only",
+      "upstream": "ollama.com/library/deepseek-coder"
+    }
+  ]
+}
