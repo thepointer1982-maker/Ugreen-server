@@ -96,6 +96,12 @@ def main() -> None:
         assert "tool_timeout_sec = 10" in generated_profile
         assert '"project_context"' in generated_profile
         assert '"record_project_handoff"' in generated_profile
+        assert '"autonomy_status"' in generated_profile
+        assert '"autonomy_policy"' in generated_profile
+        assert '"enqueue_autonomy_task"' in generated_profile
+        assert '"run_autonomy_cycle"' in generated_profile
+        assert "AEGIS_AUTONOMY_POLICY" in generated_profile
+        assert "AEGIS_AUTONOMY_STATE_DIR" in generated_profile
 
         wrapper = (outbin / "aegis-codex-local").read_text(encoding="utf-8")
         assert f'export CODEX_HOME="{home}"' in wrapper
