@@ -19,6 +19,8 @@ CODEX_OSS_STATE="${AEGIS_CODEX_OSS_STATE_FILE:-$HOME/.local/state/aegis-codex-os
 LOCAL_CODEX_WRAPPER="${AEGIS_CODEX_OSS_WRAPPER:-$HOME/.local/bin/aegis-codex-local}"
 ALLOW_CLOUD_CODEX="${AEGIS_ALLOW_CLOUD_CODEX:-0}"
 PROJECT_CONTEXT_SCRIPT="$REPO_ROOT/scripts/aegis_project_context.py"
+MODEL_SELECTOR="$REPO_ROOT/scripts/aegis_local_model_select.py"
+OPENCODE_GUARD="$REPO_ROOT/scripts/aegis_opencode_guard.py"
 PROJECT_CONTEXT_REQUIRED="${AEGIS_PROJECT_CONTEXT_REQUIRED:-1}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 WORKTREE="$WORK_ROOT/$STAMP"
@@ -71,6 +73,8 @@ opencode_local_ready() {
   command -v opencode >/dev/null 2>&1 || return 1
   ollama_loopback_ready || return 1
   [[ -f "$CONFIG" ]] || return 1
+  [[ -f "$OPENCODE_GUARD" ]] || return 1
+  python3 "$OPENCODE_GUARD" --require-modern --no-write >/dev/null 2>&1
 }
 
 codex_cloud_ready() {
@@ -170,6 +174,18 @@ case "$MODE" in
   *) CONTEXT_CHANNEL="mcp" ;;
 esac
 
+SELECTED_MODEL="$LOCAL_MODEL"
+if [[ "$MODE" == "codex-local" || "$MODE" == "local" ]] && [[ -f "$MODEL_SELECTOR" ]]; then
+  set +e
+  selected_candidate="$(python3 "$MODEL_SELECTOR" --task "$TASK" 2>/dev/null)"
+  selector_rc=$?
+  set -e
+  if [[ "$selector_rc" -eq 0 && -n "$selected_candidate" ]]; then
+    SELECTED_MODEL="$selected_candidate"
+  fi
+fi
+LOCAL_MODEL="$SELECTED_MODEL"
+
 context_rc=0
 CONTEXT_PACKET=""
 if [[ -f "$PROJECT_CONTEXT_SCRIPT" ]]; then
@@ -221,6 +237,7 @@ echo "context_channel=$CONTEXT_CHANNEL" | tee -a "$REPORT/meta.txt"
 echo "context_required=$PROJECT_CONTEXT_REQUIRED" | tee -a "$REPORT/meta.txt"
 echo "cloud_fallback_allowed=$ALLOW_CLOUD_CODEX" | tee -a "$REPORT/meta.txt"
 echo "boot_state=$BOOT_STATE" | tee -a "$REPORT/meta.txt"
+echo "local_model=$LOCAL_MODEL" | tee -a "$REPORT/meta.txt"
 echo "worktree=$WORKTREE" | tee -a "$REPORT/meta.txt"
 
 set +e
@@ -276,7 +293,7 @@ if [[ -d "$WORKTREE/scripts" ]]; then
 fi
 
 cat > "$REPORT/result.json" <<EOF
-{"mode":"$MODE","agent_rc":$rc,"validation_rc":$validate_rc,"report":"$REPORT","worktree_kept":${AEGIS_CODER_KEEP_WORKTREE:-0},"cloud_fallback_allowed":$ALLOW_CLOUD_CODEX,"project_context_required":$PROJECT_CONTEXT_REQUIRED,"context_channel":"$CONTEXT_CHANNEL"}
+{"mode":"$MODE","model":"$LOCAL_MODEL","agent_rc":$rc,"validation_rc":$validate_rc,"report":"$REPORT","worktree_kept":${AEGIS_CODER_KEEP_WORKTREE:-0},"cloud_fallback_allowed":$ALLOW_CLOUD_CODEX,"project_context_required":$PROJECT_CONTEXT_REQUIRED,"context_channel":"$CONTEXT_CHANNEL"}
 EOF
 cat "$REPORT/result.json"
 
