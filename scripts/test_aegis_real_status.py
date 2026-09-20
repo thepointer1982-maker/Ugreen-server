@@ -279,6 +279,26 @@ def main() -> None:
         assert status["control"]["autonomy"]["policy"]["recurring_cloud_ai_cost_allowed"] is False
         assert status["_provenance"]["kind"] == "real-status"
 
+        (root / "state" / "aegis-pull-control" / "state.json").write_text(
+            json.dumps(
+                {
+                    "status": "success",
+                    "transport": "outbound-pull",
+                    "runner_required": False,
+                    "last_sequence": 18,
+                    "trusted_sha": "f" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+        migrated = mod.build_status(root)
+        assert migrated["health"] == "healthy"
+        assert "pull-control-provenance-invalid" in migrated["warnings"]
+        assert migrated["control"]["primary"]["ready"] is True
+        assert migrated["control"]["pull_control"]["status"] == "unverified"
+        assert migrated["control"]["pull_control"]["last_sequence"] is None
+        assert migrated["control"]["pull_control"]["trusted_sha"] is None
+
     print("AEGIS REAL STATUS TESTS PASS")
 
 
