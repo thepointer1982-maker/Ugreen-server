@@ -107,3 +107,77 @@ Restore:
 AEGIS does not automatically format disks, alter partitions, edit EFI/bootloaders, modify BIOS, delete display drivers, or install a replacement GPU driver in this incident path.
 
 If evidence identifies the display driver, the next gate is to record the exact adapter/driver version and then use Windows Update / Lenovo-supported rollback or update with a restore path.
+
+
+## New priority: fingerprint / power-button / Windows Hello transition
+
+The failure is now reported immediately before sign-in while using the thumb/fingerprint button. On Lenovo systems where the fingerprint reader is integrated with the power button, one physical interaction can participate in both wake/power and Windows Hello authentication. The collector therefore treats this as the highest-priority path until evidence rules it out.
+
+AEGIS now records:
+
+- biometric PnP endpoints and signed biometric driver metadata
+- Windows Biometric Service (`WbioSrvc`)
+- `Microsoft-Windows-Biometrics/Operational`
+- biometric Event ID 1108
+- `bioiso.exe` / `ngciso.exe`
+- Device Guard / VBS state
+- Winlogon / LogonUI / userinit / DWM / Explorer process state
+- pre-login snapshots from a SYSTEM startup task
+- Codex process liveness without collecting its prompt or command line
+- Apple/iPhone USB-C PnP presence and USB/PnP warning/error events
+
+### Pre-login watcher
+
+The normal user watcher starts only after logon, which can miss this failure. The new SYSTEM watcher starts at Windows startup and samples the first three minutes:
+
+```powershell
+# elevated PowerShell
+.\windows\Install-LenovoPointerBlackScreenWatch.ps1 -Action InstallBoot
+```
+
+Or install both user + boot watchers:
+
+```powershell
+# elevated PowerShell
+.\windows\Install-LenovoPointerBlackScreenWatch.ps1 -Action InstallAll
+```
+
+Boot evidence is written to:
+
+```text
+C:\ProgramData\AEGIS\LenovoPointer\BlackScreen
+```
+
+The SYSTEM watcher directory is ACL-restricted; authenticated users receive read/execute only.
+
+### Fingerprint A/B isolation
+
+First inspect only:
+
+```powershell
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action PlanFingerprintIsolation
+```
+
+For one controlled boot, only if PIN/password sign-in is known to work:
+
+```powershell
+# elevated PowerShell
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action ApplyFingerprintIsolation -ConfirmAlternativeSignIn
+```
+
+Then sign in using PIN/password instead of the fingerprint reader. Restore afterwards:
+
+```powershell
+# elevated PowerShell
+.\windows\Repair-LenovoPointerBlackScreen.ps1 -Action RestoreFingerprint
+```
+
+This does not delete Windows Hello enrollment. It disables only the matching biometric PnP endpoint for the A/B test and preserves a restore record.
+
+### Codex preservation
+
+Codex is treated as a protected workload. AEGIS records only process liveness/CPU/memory metadata for `codex`, `node`, `python`, `pwsh`, and related processes. The incident scripts do not terminate Codex and do not collect prompt text or command-line arguments.
+
+### USB-C / iPhone
+
+The current iPhone USB-C connection is recorded as a separate correlation path. A connected iPhone is not assumed to cause the black screen. The collector records Apple/iPhone PnP presence plus USBHUB3/USBXHCI/Kernel-PnP warnings/errors so its timing can be compared with the sign-in failure.
