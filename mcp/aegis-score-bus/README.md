@@ -71,4 +71,4 @@ Use `mcp-config.example.json` as the client configuration and adapt only local f
 
 ## Verification
 
-The engine test suite covers verified exports, fixture suppression, unchanged-baseline silence, hash mismatch, conflicting verified scores, first real-device evidence, disappearance of verified evidence, same-value provenance changes, positive numeric improvement and suppression of repeated unchanged-conflict notifications.
+The engine test suite covers verified exports, fixture suppression, unchanged-baseline silence, hash mismatch, conflicting verified scores, first real-device evidence, disappearance of verified evidence, same-value provenance changes, positive numeric improvement, lower-is-better anomaly semantics, device-array conflict suppression, repeated-conflict suppression, bound export-session sidecars, and rejection of unbound sidecars.
