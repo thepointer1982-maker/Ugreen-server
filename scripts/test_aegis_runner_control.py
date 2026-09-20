@@ -106,6 +106,9 @@ def main():
     assert "Restart=always" in s
     assert "sudo -n true" in s
     assert "sudo ./svc.sh" not in s
+    assert "sha256sum -c -" in s
+    assert "70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613" in s
+    assert "9b1dc70626422526e3c94767cf024896beb15da5342a3f4819bf2feac13e0393" in s
 
     w = WORKFLOW.read_text(encoding="utf-8")
     assert "runs-on: [self-hosted, linux, aegis-ugreen-v2]" in w

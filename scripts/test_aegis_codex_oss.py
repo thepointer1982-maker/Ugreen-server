@@ -102,6 +102,7 @@ def main() -> None:
         assert '"worker_fleet_status"' in generated_profile
         assert '"wake_worker"' in generated_profile
         assert '"voice_bridge_status"' in generated_profile
+        assert '"runtime_backup_status"' in generated_profile
         assert '"autonomy_status"' in generated_profile
         assert '"autonomy_policy"' in generated_profile
         assert '"enqueue_autonomy_task"' in generated_profile

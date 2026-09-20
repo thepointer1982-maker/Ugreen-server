@@ -72,6 +72,12 @@ VOICE_STATUS_FILE = Path(
         Path.home() / ".local/state/aegis-voice/status.json",
     )
 )
+RUNTIME_BACKUP_STATUS_FILE = Path(
+    os.environ.get(
+        "AEGIS_RUNTIME_BACKUP_STATUS_FILE",
+        Path.home() / ".local/state/aegis-runtime-backup/status.json",
+    )
+)
 
 mcp = MCPServer(
     "AEGIS Local Guardian",
@@ -269,6 +275,16 @@ def voice_resource() -> str:
     )
 
 
+@mcp.resource("aegis://backup/runtime")
+def runtime_backup_resource() -> str:
+    """Verified encrypted local runtime backup status; no keys or restore action."""
+    return json.dumps(
+        _verified_state(RUNTIME_BACKUP_STATUS_FILE, "not-yet-created"),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def guardian_status() -> dict:
     """Return the latest guardian status without changing the machine."""
@@ -393,6 +409,12 @@ def wake_worker(worker_id: str) -> dict:
 def voice_bridge_status() -> dict:
     """Return verified local Unix-socket Alexa/voice bridge status."""
     return _verified_state(VOICE_STATUS_FILE, "not-yet-running")
+
+
+@mcp.tool()
+def runtime_backup_status() -> dict:
+    """Return verified encrypted local runtime backup status; read-only."""
+    return _verified_state(RUNTIME_BACKUP_STATUS_FILE, "not-yet-created")
 
 
 @mcp.tool()

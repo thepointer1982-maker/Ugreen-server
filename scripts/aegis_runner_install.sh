@@ -38,7 +38,7 @@ if [[ "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-for cmd in curl tar git python3; do
+for cmd in curl tar git python3 sha256sum; do
   command -v "$cmd" >/dev/null || { echo "$cmd missing" >&2; exit 3; }
 done
 
@@ -47,8 +47,14 @@ chmod 700 "$RUNNER_DIR" "$RUNTIME_ROOT" "$STATE_DIR"
 
 arch="$(uname -m)"
 case "$arch" in
-  x86_64|amd64) pkg_arch="x64" ;;
-  aarch64|arm64) pkg_arch="arm64" ;;
+  x86_64|amd64)
+    pkg_arch="x64"
+    runner_sha256="70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613"
+    ;;
+  aarch64|arm64)
+    pkg_arch="arm64"
+    runner_sha256="9b1dc70626422526e3c94767cf024896beb15da5342a3f4819bf2feac13e0393"
+    ;;
   *) echo "Unsupported architecture: $arch" >&2; exit 5 ;;
 esac
 
@@ -63,6 +69,7 @@ if [[ "$configured" -ne 1 ]]; then
   if [[ ! -f "$pkg" ]]; then
     curl -fL --retry 3 --retry-delay 2 -o "$pkg" "$url"
   fi
+  printf '%s  %s\n' "$runner_sha256" "$pkg" | sha256sum -c -
   if [[ ! -x ./config.sh ]]; then
     tar xzf "$pkg"
   fi
