@@ -4,6 +4,12 @@ set -euo pipefail
 REPO_ROOT="${AEGIS_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UNIT_DIR="$HOME/.config/systemd/user"
 STATE_DIR="$HOME/.local/state/aegis-pull-control"
+NO_START="${AEGIS_PULL_CONTROL_NO_START:-0}"
+
+[[ "$NO_START" == "0" || "$NO_START" == "1" ]] || {
+  echo "AEGIS_PULL_CONTROL_NO_START must be 0 or 1" >&2
+  exit 64
+}
 
 command -v python3 >/dev/null || { echo "python3 missing" >&2; exit 3; }
 command -v git >/dev/null || { echo "git missing" >&2; exit 3; }
@@ -44,6 +50,10 @@ EOF
 
 systemctl --user daemon-reload
 systemctl --user enable --now aegis-pull-control.timer
-systemctl --user start aegis-pull-control.service
+if [[ "$NO_START" == "1" ]]; then
+  echo "AEGIS_PULL_CONTROL self_update=deferred_current_service"
+else
+  systemctl --user start aegis-pull-control.service
+fi
 systemctl --user --no-pager status aegis-pull-control.timer || true
 echo "state=$STATE_DIR/state.json"
