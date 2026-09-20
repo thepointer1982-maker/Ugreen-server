@@ -1,0 +1,6 @@
+# AEGIS Local Codex profile
+# Copied to $CODEX_HOME/aegis-local.config.toml by the installer.
+# Inference provider is selected with --oss --local-provider ollama.
+oss_provider = "ollama"
+web_search = "disabled"
+sandbox_mode = "workspace-write"
