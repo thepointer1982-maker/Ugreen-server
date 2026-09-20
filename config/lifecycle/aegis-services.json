@@ -141,6 +141,13 @@
       "kind": "systemd-user",
       "unit": "aegis-offline-escrow.timer",
       "required": true
+    },
+    {
+      "id": "runtime-backup",
+      "class": "privacy-core",
+      "kind": "systemd-user",
+      "unit": "aegis-runtime-backup.timer",
+      "required": true
     }
   ],
   "integration_coverage": [
@@ -218,6 +225,16 @@
         "scripts/aegis_offline_escrow_install.sh"
       ],
       "note": "Local git bundle + SHA-256 manifest; no runtime state or network upload."
+    },
+    {
+      "id": "encrypted-runtime-backup",
+      "status": "implemented",
+      "evidence": [
+        "config/backup/aegis-runtime-backup.json",
+        "scripts/aegis_runtime_backup.py",
+        "scripts/aegis_runtime_backup_install.sh"
+      ],
+      "note": "AES-256-CBC/PBKDF2 encrypted local runtime backup with separate HMAC-SHA256 integrity key; no models, Docker volumes, source repository, secrets or network upload; restore is staging-only."
     }
   ]
 }
