@@ -43,14 +43,44 @@ HEAD_SHA="$(git rev-parse HEAD)"
 echo "repo=$DEST"
 echo "head=$HEAD_SHA"
 
+echo "=== AEGIS USER SERVICE PERSISTENCE ==="
+PERSISTENCE_STATUS="unknown"
+if [[ -f scripts/aegis_user_persistence.sh ]]; then
+  set +e
+  bash scripts/aegis_user_persistence.sh
+  persistence_rc=$?
+  set -e
+  if [[ "$persistence_rc" -eq 0 ]]; then
+    PERSISTENCE_STATUS="checked"
+  else
+    PERSISTENCE_STATUS="failed:$persistence_rc"
+  fi
+fi
+echo "user_persistence=$PERSISTENCE_STATUS"
+
 echo "=== AEGIS PRIMARY ZERO-COST CONTROL ==="
 bash scripts/aegis_pull_control_install.sh
+
+echo "=== AEGIS LOCAL CODEX OSS ==="
+CODEX_OSS_STATUS="skipped"
+set +e
+AEGIS_ALLOW_CODEX_INSTALL="${AEGIS_ALLOW_CODEX_INSTALL:-1}" \
+AEGIS_ALLOW_MODEL_DOWNLOAD="${AEGIS_ALLOW_MODEL_DOWNLOAD:-1}" \
+bash scripts/aegis_codex_oss_install.sh
+codex_oss_rc=$?
+set -e
+if [[ "$codex_oss_rc" -eq 0 ]]; then
+  CODEX_OSS_STATUS="ready"
+else
+  CODEX_OSS_STATUS="failed:$codex_oss_rc"
+fi
+echo "codex_oss=$CODEX_OSS_STATUS"
 
 echo "=== AEGIS CODER BOOT GUARDIAN ==="
 CODER_BOOT_STATUS="skipped"
 if systemctl --user show-environment >/dev/null 2>&1; then
   set +e
-  AEGIS_CODER_PREFER="${AEGIS_CODER_PREFER:-local}" bash scripts/aegis_coder_boot_install.sh
+  AEGIS_CODER_PREFER="${AEGIS_CODER_PREFER:-codex-local}" AEGIS_ALLOW_CLOUD_CODEX="${AEGIS_ALLOW_CLOUD_CODEX:-0}" bash scripts/aegis_coder_boot_install.sh
   coder_boot_rc=$?
   set -e
   if [[ "$coder_boot_rc" -eq 0 ]]; then
@@ -102,5 +132,7 @@ if [[ "$rc" -ne 0 ]]; then
 fi
 
 echo "AEGIS zero-cost pull control active."
+echo "user_persistence=$PERSISTENCE_STATUS"
+echo "codex_oss=$CODEX_OSS_STATUS"
 echo "coder_boot_guardian=$CODER_BOOT_STATUS"
 echo "runner_return_channel=$RUNNER_STATUS"
