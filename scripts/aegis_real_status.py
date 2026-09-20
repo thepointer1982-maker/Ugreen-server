@@ -191,6 +191,12 @@ def build_status(repo: Path) -> dict[str, Any]:
             home_state / "aegis-voice" / "status.json",
         )
     )
+    runtime_backup_file = Path(
+        os.environ.get(
+            "AEGIS_RUNTIME_BACKUP_STATUS_FILE",
+            home_state / "aegis-runtime-backup" / "status.json",
+        )
+    )
 
     real = read_json(real_dir / "latest.json")
     ai = read_json(ai_dir / "latest.json")
@@ -206,6 +212,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     lifecycle = read_json(lifecycle_file)
     workers = read_json(worker_file)
     voice = read_json(voice_file)
+    runtime_backup = read_json(runtime_backup_file)
     env_path = scheduler_dir / "state.env"
     if env_path.is_file():
         for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -226,6 +233,7 @@ def build_status(repo: Path) -> dict[str, Any]:
     pull_control_timer = systemd_status("aegis-pull-control.timer")
     lifecycle_timer = systemd_status("aegis-lifecycle.timer")
     voice_service = systemd_status("aegis-voice-bridge.service")
+    runtime_backup_timer = systemd_status("aegis-runtime-backup.timer")
 
     health = "healthy"
     blockers: list[str] = []
@@ -399,6 +407,34 @@ def build_status(repo: Path) -> dict[str, Any]:
     ):
         warnings.append("voice-bridge-inactive")
 
+    runtime_backup_ok = False
+    runtime_backup_reason = "missing"
+    if runtime_backup:
+        runtime_backup_ok, runtime_backup_reason = verify_provenance(runtime_backup)
+        if not runtime_backup_ok:
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("runtime-backup-provenance-invalid")
+        elif runtime_backup.get("health") != "healthy":
+            if health == "healthy":
+                health = "degraded"
+            blockers.append("runtime-backup-unhealthy")
+    elif (
+        runtime_backup_timer.get("available")
+        and runtime_backup_timer.get("LoadState") == "loaded"
+        and runtime_backup_timer.get("ActiveState") == "active"
+    ):
+        warnings.append("runtime-backup-not-yet-created")
+
+    if (
+        runtime_backup_timer.get("available")
+        and runtime_backup_timer.get("LoadState") == "loaded"
+        and runtime_backup_timer.get("ActiveState") != "active"
+    ):
+        if health == "healthy":
+            health = "degraded"
+        blockers.append("runtime-backup-timer-inactive")
+
     return attach_provenance(
         {
             "schema": "aegis-real-status/v1",
@@ -435,6 +471,7 @@ def build_status(repo: Path) -> dict[str, Any]:
                 "pull_control_timer": pull_control_timer,
                 "lifecycle_timer": lifecycle_timer,
                 "voice_bridge_service": voice_service,
+                "runtime_backup_timer": runtime_backup_timer,
             },
             "control": {
                 "primary": {
@@ -560,6 +597,21 @@ def build_status(repo: Path) -> dict[str, Any]:
                     "provenance_reason": voice_reason,
                     "systemd_service": voice_service,
                 },
+                "runtime_backup": {
+                    "health": runtime_backup.get("health"),
+                    "last_backup": runtime_backup.get("last_backup"),
+                    "cipher_sha256": runtime_backup.get("cipher_sha256"),
+                    "key_fingerprint": runtime_backup.get("key_fingerprint"),
+                    "file_count": runtime_backup.get("file_count"),
+                    "size_bytes": runtime_backup.get("size_bytes"),
+                    "encrypted": runtime_backup.get("encrypted"),
+                    "network_upload": runtime_backup.get("network_upload"),
+                    "provenance_verified": (
+                        runtime_backup_ok if runtime_backup else None
+                    ),
+                    "provenance_reason": runtime_backup_reason,
+                    "systemd_timer": runtime_backup_timer,
+                },
             },
             "ollama": {
                 "reachable": ollama.get("reachable"),
@@ -626,6 +678,10 @@ def build_status(repo: Path) -> dict[str, Any]:
                 ),
                 "voice": file_state(
                     voice_file,
+                    verify=True,
+                ),
+                "runtime_backup": file_state(
+                    runtime_backup_file,
                     verify=True,
                 ),
             },
