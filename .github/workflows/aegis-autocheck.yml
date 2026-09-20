@@ -41,6 +41,8 @@ on:
       - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
       - 'windows/Watch-LenovoPointerBlackScreen.ps1'
       - 'windows/Recover-LenovoPointerBlackScreen.ps1'
+      - 'windows/Resolve-LenovoPointerBlackScreen.ps1'
+      - 'windows/Supervise-LenovoPointerBlackScreen.ps1'
       - 'windows/Watch-LenovoPointerBlackScreenBoot.ps1'
       - 'windows/Collect-LenovoPointerBlackScreen.ps1'
       - 'docs/lenovopointer-black-screen.md'
@@ -112,6 +114,8 @@ on:
       - 'windows/Install-LenovoPointerBlackScreenWatch.ps1'
       - 'windows/Watch-LenovoPointerBlackScreen.ps1'
       - 'windows/Recover-LenovoPointerBlackScreen.ps1'
+      - 'windows/Resolve-LenovoPointerBlackScreen.ps1'
+      - 'windows/Supervise-LenovoPointerBlackScreen.ps1'
       - 'windows/Watch-LenovoPointerBlackScreenBoot.ps1'
       - 'windows/Collect-LenovoPointerBlackScreen.ps1'
       - 'docs/lenovopointer-black-screen.md'
@@ -205,6 +209,8 @@ jobs:
             "windows/Collect-LenovoPointerBlackScreen.ps1",
             "windows/Watch-LenovoPointerBlackScreen.ps1",
             "windows/Recover-LenovoPointerBlackScreen.ps1",
+            "windows/Resolve-LenovoPointerBlackScreen.ps1",
+            "windows/Supervise-LenovoPointerBlackScreen.ps1",
             "windows/Watch-LenovoPointerBlackScreenBoot.ps1",
             "windows/Install-LenovoPointerBlackScreenWatch.ps1",
             "windows/Repair-LenovoPointerBlackScreen.ps1",
